@@ -1,0 +1,1691 @@
+{
+  "info": {
+    "_postman_id": "cold-storage-complete-v2",
+    "name": "Cold Storage Monitoring System — Complete API Tests",
+    "description": "Full test suite for the IoT Cold Storage Monitoring System API.\n\n**How to run:**\n1. Import this collection + environment file.\n2. Select 'Cold Storage - Development' environment.\n3. Run via Collection Runner in ORDER — folder by folder.\n4. Folder 1 (Auth) must run first as it saves all tokens.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{superAdminToken}}", "type": "string" }]
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5000/api/v1" }
+  ],
+  "item": [
+
+    {
+      "name": "0. Health & Server",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{healthUrl}}/health", "host": ["{{healthUrl}}"], "path": ["health"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Service ok', () => pm.expect(r.status).to.eql('ok'));",
+            "pm.test('✅ Has uptime', () => pm.expect(r.uptime).to.be.a('string'));",
+            "pm.test('✅ Has version', () => pm.expect(r.version).to.be.a('string'));",
+            "console.log('Server:', r.service, '| Env:', r.environment, '| Uptime:', r.uptime);"
+          ]}}]
+        },
+        {
+          "name": "GET /api-docs (Swagger UI)",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{healthUrl}}/api-docs", "host": ["{{healthUrl}}"], "path": ["api-docs"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Swagger UI accessible', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "[SA] Login — Super Admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{saEmail}}\",\n  \"password\": \"{{saPassword}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Success true', () => pm.expect(r.success).to.be.true);",
+            "pm.test('✅ Has accessToken', () => pm.expect(r.data.accessToken).to.be.a('string'));",
+            "pm.test('✅ Has refreshToken', () => pm.expect(r.data.refreshToken).to.be.a('string'));",
+            "pm.test('✅ Role is super_admin', () => pm.expect(r.data.user.role.name).to.eql('super_admin'));",
+            "pm.test('✅ Password not exposed', () => pm.expect(r.data.user).to.not.have.property('password'));",
+            "pm.environment.set('superAdminToken', r.data.accessToken);",
+            "pm.environment.set('superAdminRefresh', r.data.refreshToken);",
+            "pm.environment.set('superAdminId', r.data.user._id);",
+            "console.log('✅ SA token saved:', r.data.user.email);"
+          ]}}]
+        },
+        {
+          "name": "[AD] Login — Admin",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Role is admin', () => pm.expect(r.data.user.role.name).to.eql('admin'));",
+            "pm.environment.set('adminToken', r.data.accessToken);",
+            "pm.environment.set('adminRefresh', r.data.refreshToken);"
+          ]}}]
+        },
+        {
+          "name": "[OP] Login — Operator",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{operatorEmail}}\",\n  \"password\": \"{{operatorPassword}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Role is operator', () => pm.expect(r.data.user.role.name).to.eql('operator'));",
+            "pm.environment.set('operatorToken', r.data.accessToken);",
+            "pm.environment.set('operatorRefresh', r.data.refreshToken);",
+            "pm.environment.set('operatorUserId', r.data.user._id);"
+          ]}}]
+        },
+        {
+          "name": "[VW] Login — Viewer",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{viewerEmail}}\",\n  \"password\": \"{{viewerPassword}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Role is viewer', () => pm.expect(r.data.user.role.name).to.eql('viewer'));",
+            "pm.environment.set('viewerToken', r.data.accessToken);",
+            "pm.environment.set('viewerRefresh', r.data.refreshToken);",
+            "pm.environment.set('viewerUserId', r.data.user._id);"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /auth/me",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Email matches', () => pm.expect(r.data.email).to.eql(pm.environment.get('saEmail')));",
+            "pm.test('✅ Role populated', () => pm.expect(r.data.role).to.have.property('name'));",
+            "pm.test('✅ AssignedDevices is array', () => pm.expect(r.data.assignedDevices).to.be.an('array'));",
+            "pm.test('✅ Password not exposed', () => pm.expect(r.data).to.not.have.property('password'));"
+          ]}}]
+        },
+        {
+          "name": "[SA] POST /auth/refresh-token",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{superAdminRefresh}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/auth/refresh-token", "host": ["{{baseUrl}}"], "path": ["auth", "refresh-token"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ New access token issued', () => pm.expect(r.data.accessToken).to.be.a('string'));",
+            "pm.test('✅ New refresh token issued', () => pm.expect(r.data.refreshToken).to.be.a('string'));",
+            "pm.test('✅ Tokens are rotated', () => pm.expect(r.data.accessToken).to.not.eql(pm.environment.get('superAdminToken')));",
+            "pm.environment.set('superAdminToken', r.data.accessToken);",
+            "pm.environment.set('superAdminRefresh', r.data.refreshToken);"
+          ]}}]
+        },
+        {
+          "name": "[SA] POST /auth/logout",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "pm.sendRequest({",
+              "  url: pm.environment.get('baseUrl') + '/auth/login',",
+              "  method: 'POST',",
+              "  header: { 'Content-Type': 'application/json' },",
+              "  body: { mode: 'raw', raw: JSON.stringify({ email: pm.environment.get('adminEmail'), password: pm.environment.get('adminPassword') }) }",
+              "}, (err, res) => {",
+              "  if (!err && res.json().data) pm.environment.set('tempRefreshToken', res.json().data.refreshToken);",
+              "});"
+            ]}},
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "const r = pm.response.json();",
+              "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('✅ Logout successful', () => pm.expect(r.success).to.be.true);"
+            ]}}
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{tempRefreshToken}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/auth/logout", "host": ["{{baseUrl}}"], "path": ["auth", "logout"] }
+          }
+        },
+        {
+          "name": "[SA] POST /auth/logout-all",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "// Login admin to get fresh token, then we'll logout-all for admin to test it",
+              "pm.sendRequest({",
+              "  url: pm.environment.get('baseUrl') + '/auth/login',",
+              "  method: 'POST',",
+              "  header: { 'Content-Type': 'application/json' },",
+              "  body: { mode: 'raw', raw: JSON.stringify({ email: pm.environment.get('adminEmail'), password: pm.environment.get('adminPassword') }) }",
+              "}, (err, res) => {",
+              "  if (!err && res.json().data) {",
+              "    pm.environment.set('tempLogoutToken', res.json().data.accessToken);",
+              "  }",
+              "});"
+            ]}},
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+              "pm.test('✅ Logout all successful', () => pm.expect(pm.response.json().success).to.be.true);"
+            ]}}
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{tempLogoutToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/logout-all", "host": ["{{baseUrl}}"], "path": ["auth", "logout-all"] }
+          }
+        },
+        {
+          "name": "[ERR] Login — Wrong Password → 401",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"superadmin@coldstorage.com\",\n  \"password\": \"WrongPass@999\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 401', () => pm.response.to.have.status(401));",
+            "pm.test('✅ success is false', () => pm.expect(pm.response.json().success).to.be.false);",
+            "pm.test('✅ Error message present', () => pm.expect(pm.response.json().message).to.be.a('string'));"
+          ]}}]
+        },
+        {
+          "name": "[ERR] Login — Missing Password → 400",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"superadmin@coldstorage.com\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 400', () => pm.response.to.have.status(400));",
+            "const r = pm.response.json();",
+            "pm.test('✅ success false', () => pm.expect(r.success).to.be.false);",
+            "pm.test('✅ Validation errors present', () => pm.expect(r.errors).to.be.an('array').that.is.not.empty);"
+          ]}}]
+        },
+        {
+          "name": "[ERR] Login — Invalid Email Format → 400",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"Admin@1234\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('✅ Email validation error', () => {",
+            "  const r = pm.response.json();",
+            "  pm.expect(r.errors.some(e => e.field === 'email')).to.be.true;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[ERR] GET /auth/me — No Token → 401",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 401', () => pm.response.to.have.status(401));",
+            "pm.test('✅ Unauthorized message', () => pm.expect(pm.response.json().success).to.be.false);"
+          ]}}]
+        },
+        {
+          "name": "[ERR] GET /auth/me — Invalid Token → 401",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "invalid.jwt.token", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 401', () => pm.response.to.have.status(401));"
+          ]}}]
+        },
+        {
+          "name": "[ERR] POST /auth/refresh-token — Revoked Token → 401",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"refreshToken\": \"{{tempRefreshToken}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/auth/refresh-token", "host": ["{{baseUrl}}"], "path": ["auth", "refresh-token"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 401 — revoked token rejected', () => pm.response.to.have.status(401));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "2. Vegetables",
+      "item": [
+        {
+          "name": "[SA] GET /vegetables — All (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/vegetables?page=1&limit=10&sortBy=name&sortOrder=asc", "host": ["{{baseUrl}}"], "path": ["vegetables"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"10"},{"key":"sortBy","value":"name"},{"key":"sortOrder","value":"asc"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Paginated response', () => {",
+            "  pm.expect(r.meta.pagination.total).to.be.a('number');",
+            "  pm.expect(r.data).to.be.an('array');",
+            "});",
+            "pm.test('✅ Has 6 seeded vegetables', () => pm.expect(r.meta.pagination.total).to.be.at.least(6));",
+            "pm.test('✅ Vegetable has required fields', () => {",
+            "  const v = r.data[0];",
+            "  pm.expect(v).to.have.property('name');",
+            "  pm.expect(v.temperature).to.have.all.keys('min','max');",
+            "  pm.expect(v.humidity).to.have.all.keys('min','max');",
+            "  pm.expect(v).to.have.property('storageDurationDays');",
+            "});",
+            "const potato = r.data.find(v => v.name === 'Potato');",
+            "const tomato = r.data.find(v => v.name === 'Tomato');",
+            "if (potato) pm.environment.set('potatoVegetableId', potato._id);",
+            "if (tomato) pm.environment.set('tomatoVegetableId', tomato._id);"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /vegetables — Search by name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/vegetables?search=potato", "host": ["{{baseUrl}}"], "path": ["vegetables"], "query": [{"key":"search","value":"potato"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Search returns potato', () => {",
+            "  pm.expect(r.data.length).to.be.at.least(1);",
+            "  pm.expect(r.data[0].name.toLowerCase()).to.include('potato');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] POST /vegetables — Create",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Spinach\",\n  \"description\": \"Fresh spinach requires very cold storage\",\n  \"temperature\": { \"min\": 0, \"max\": 4 },\n  \"humidity\": { \"min\": 90, \"max\": 98 },\n  \"storageDurationDays\": 10\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/vegetables", "host": ["{{baseUrl}}"], "path": ["vegetables"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Vegetable created', () => {",
+            "  pm.expect(r.data.name).to.eql('Spinach');",
+            "  pm.expect(r.data.temperature.min).to.eql(0);",
+            "  pm.expect(r.data.temperature.max).to.eql(4);",
+            "});",
+            "pm.test('✅ Has _id', () => pm.expect(r.data._id).to.be.a('string'));",
+            "pm.environment.set('testVegetableId', r.data._id);"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /vegetables/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/vegetables/{{testVegetableId}}", "host": ["{{baseUrl}}"], "path": ["vegetables", "{{testVegetableId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Correct vegetable', () => pm.expect(r.data.name).to.eql('Spinach'));",
+            "pm.test('✅ Has all fields', () => {",
+            "  pm.expect(r.data).to.have.all.keys('_id','name','description','temperature','humidity','storageDurationDays','isActive','createdAt','updatedAt');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] PUT /vegetables/:id — Update",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"storageDurationDays\": 14,\n  \"description\": \"Updated: Fresh spinach cold storage\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/vegetables/{{testVegetableId}}", "host": ["{{baseUrl}}"], "path": ["vegetables", "{{testVegetableId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ storageDurationDays updated to 14', () => pm.expect(r.data.storageDurationDays).to.eql(14));",
+            "pm.test('✅ description updated', () => pm.expect(r.data.description).to.include('Updated'));"
+          ]}}]
+        },
+        {
+          "name": "[ERR] POST /vegetables — Duplicate Name → 409",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Potato\",\n  \"temperature\": { \"min\": 2, \"max\": 8 },\n  \"humidity\": { \"min\": 85, \"max\": 95 },\n  \"storageDurationDays\": 90\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/vegetables", "host": ["{{baseUrl}}"], "path": ["vegetables"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 409 Conflict', () => pm.response.to.have.status(409));",
+            "pm.test('✅ Duplicate error message', () => pm.expect(pm.response.json().message).to.include('already exists'));"
+          ]}}]
+        },
+        {
+          "name": "[ERR] POST /vegetables — Invalid Temp Range (min >= max) → 400",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"BadVeg\",\n  \"temperature\": { \"min\": 10, \"max\": 5 },\n  \"humidity\": { \"min\": 80, \"max\": 95 },\n  \"storageDurationDays\": 30\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/vegetables", "host": ["{{baseUrl}}"], "path": ["vegetables"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('✅ Validation error for temperature', () => pm.expect(pm.response.json().success).to.be.false);"
+          ]}}]
+        },
+        {
+          "name": "[ERR] POST /vegetables — Missing Required Fields → 400",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Incomplete\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/vegetables", "host": ["{{baseUrl}}"], "path": ["vegetables"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('✅ Multiple field errors', () => pm.expect(pm.response.json().errors.length).to.be.at.least(2));"
+          ]}}]
+        },
+        {
+          "name": "[ERR] GET /vegetables/:id — Invalid ObjectId → 400",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/vegetables/invalid-id-here", "host": ["{{baseUrl}}"], "path": ["vegetables", "invalid-id-here"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 400', () => pm.response.to.have.status(400));"
+          ]}}]
+        },
+        {
+          "name": "[SA] DELETE /vegetables/:id — Cleanup",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/vegetables/{{testVegetableId}}", "host": ["{{baseUrl}}"], "path": ["vegetables", "{{testVegetableId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Deleted successfully', () => pm.expect(pm.response.json().success).to.be.true);"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "3. Devices",
+      "item": [
+        {
+          "name": "[SA] GET /devices — All (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices?page=1&limit=10&sortBy=deviceId&sortOrder=asc", "host": ["{{baseUrl}}"], "path": ["devices"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"10"},{"key":"sortBy","value":"deviceId"},{"key":"sortOrder","value":"asc"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Paginated response', () => {",
+            "  pm.expect(r.meta.pagination.total).to.be.a('number');",
+            "  pm.expect(r.data).to.be.an('array');",
+            "});",
+            "pm.test('✅ Has 5 seeded devices', () => pm.expect(r.meta.pagination.total).to.be.at.least(5));",
+            "pm.test('✅ Device has required fields', () => {",
+            "  const d = r.data[0];",
+            "  pm.expect(d).to.have.property('deviceId');",
+            "  pm.expect(d).to.have.property('name');",
+            "  pm.expect(d).to.have.property('location');",
+            "  pm.expect(d).to.have.property('status');",
+            "  pm.expect(d).to.have.property('isActive');",
+            "});",
+            "pm.test('✅ Vegetable populated', () => pm.expect(r.data[0].assignedVegetable).to.not.be.null);",
+            "const cs001 = r.data.find(d => d.deviceId === 'CS001');",
+            "const cs002 = r.data.find(d => d.deviceId === 'CS002');",
+            "const cs003 = r.data.find(d => d.deviceId === 'CS003');",
+            "if (cs001) pm.environment.set('cs001ObjectId', cs001._id);",
+            "if (cs002) pm.environment.set('cs002ObjectId', cs002._id);",
+            "if (cs003) pm.environment.set('cs003ObjectId', cs003._id);"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /devices — Filter status=offline",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices?status=offline", "host": ["{{baseUrl}}"], "path": ["devices"], "query": [{"key":"status","value":"offline"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All results are offline', () => {",
+            "  r.data.forEach(d => pm.expect(d.status).to.eql('offline'));",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /devices — Search by name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices?search=Storage+Unit+A", "host": ["{{baseUrl}}"], "path": ["devices"], "query": [{"key":"search","value":"Storage Unit A"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Found CS001', () => pm.expect(r.data.some(d => d.deviceId === 'CS001')).to.be.true);"
+          ]}}]
+        },
+        {
+          "name": "[SA] POST /devices — Create",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CSTEST\",\n  \"name\": \"Test Storage Unit\",\n  \"location\": \"Test Warehouse Block Z\",\n  \"description\": \"Created by Postman tests\",\n  \"alertThresholds\": {\n    \"doorOpenMinutes\": 5,\n    \"offlineMinutes\": 10\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/devices", "host": ["{{baseUrl}}"], "path": ["devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Device created', () => {",
+            "  pm.expect(r.data.deviceId).to.eql('CSTEST');",
+            "  pm.expect(r.data.status).to.eql('offline');",
+            "  pm.expect(r.data.isActive).to.be.true;",
+            "});",
+            "pm.environment.set('testDeviceObjectId', r.data._id);",
+            "pm.environment.set('testDeviceId', r.data.deviceId);"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /devices/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/{{testDeviceObjectId}}", "host": ["{{baseUrl}}"], "path": ["devices", "{{testDeviceObjectId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Correct device', () => pm.expect(r.data.deviceId).to.eql('CSTEST'));",
+            "pm.test('✅ CreatedBy populated', () => pm.expect(r.data.createdBy).to.have.property('email'));"
+          ]}}]
+        },
+        {
+          "name": "[SA] PUT /devices/:id — Update",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Updated Test Unit\",\n  \"location\": \"Updated Block Z-2\",\n  \"alertThresholds\": { \"doorOpenMinutes\": 3, \"offlineMinutes\": 15 }\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/devices/{{testDeviceObjectId}}", "host": ["{{baseUrl}}"], "path": ["devices", "{{testDeviceObjectId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Name updated', () => pm.expect(r.data.name).to.eql('Updated Test Unit'));",
+            "pm.test('✅ Thresholds updated', () => pm.expect(r.data.alertThresholds.doorOpenMinutes).to.eql(3));"
+          ]}}]
+        },
+        {
+          "name": "[SA] POST /devices/:id/vegetable — Assign Potato",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"vegetableId\": \"{{potatoVegetableId}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/devices/{{testDeviceObjectId}}/vegetable", "host": ["{{baseUrl}}"], "path": ["devices", "{{testDeviceObjectId}}", "vegetable"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Vegetable assigned', () => {",
+            "  pm.expect(r.data.assignedVegetable).to.not.be.null;",
+            "  pm.expect(r.data.assignedVegetable.name).to.eql('Potato');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] DELETE /devices/:id/vegetable — Remove",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/{{testDeviceObjectId}}/vegetable", "host": ["{{baseUrl}}"], "path": ["devices", "{{testDeviceObjectId}}", "vegetable"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Vegetable removed (null)', () => pm.expect(r.data.assignedVegetable).to.be.null);"
+          ]}}]
+        },
+        {
+          "name": "[ERR] POST /devices — Duplicate Device ID → 409",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS001\",\n  \"name\": \"Duplicate Device\",\n  \"location\": \"Somewhere\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/devices", "host": ["{{baseUrl}}"], "path": ["devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 409 Conflict', () => pm.response.to.have.status(409));",
+            "pm.test('✅ Conflict message', () => pm.expect(pm.response.json().message).to.include('already exists'));"
+          ]}}]
+        },
+        {
+          "name": "[ERR] GET /devices/:id — Non-existent → 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/507f1f77bcf86cd799439011", "host": ["{{baseUrl}}"], "path": ["devices", "507f1f77bcf86cd799439011"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 404', () => pm.response.to.have.status(404));"
+          ]}}]
+        },
+        {
+          "name": "[SA] DELETE /devices/:id — Cleanup",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/{{testDeviceObjectId}}", "host": ["{{baseUrl}}"], "path": ["devices", "{{testDeviceObjectId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "4. Users",
+      "item": [
+        {
+          "name": "[SA] GET /users — All (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users?page=1&limit=10&sortBy=createdAt&sortOrder=desc", "host": ["{{baseUrl}}"], "path": ["users"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"10"},{"key":"sortBy","value":"createdAt"},{"key":"sortOrder","value":"desc"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Paginated response', () => pm.expect(r.meta.pagination.total).to.be.at.least(4));",
+            "pm.test('✅ Role populated', () => pm.expect(r.data[0].role).to.have.property('name'));",
+            "pm.test('✅ Password not exposed', () => r.data.forEach(u => pm.expect(u).not.to.have.property('password')));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /users — Filter role=operator",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users?role=operator", "host": ["{{baseUrl}}"], "path": ["users"], "query": [{"key":"role","value":"operator"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All results are operator', () => r.data.forEach(u => pm.expect(u.role.name).to.eql('operator')));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /users — Search by name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users?search=operator", "host": ["{{baseUrl}}"], "path": ["users"], "query": [{"key":"search","value":"operator"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Results found', () => pm.expect(pm.response.json().data.length).to.be.at.least(1));"
+          ]}}]
+        },
+        {
+          "name": "[SA] POST /users — Create Test Operator",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Test Operator User\",\n  \"email\": \"testop_postman@coldstorage.com\",\n  \"password\": \"TestOp@1234\",\n  \"role\": \"operator\",\n  \"phone\": \"+91 9876543210\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ User created', () => {",
+            "  pm.expect(r.data.email).to.eql('testop_postman@coldstorage.com');",
+            "  pm.expect(r.data.role.name).to.eql('operator');",
+            "  pm.expect(r.data.isActive).to.be.true;",
+            "});",
+            "pm.test('✅ Password not in response', () => pm.expect(r.data).not.to.have.property('password'));",
+            "pm.environment.set('testUserId', r.data._id);"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /users/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users/{{testUserId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{testUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Correct user', () => pm.expect(r.data._id).to.eql(pm.environment.get('testUserId')));",
+            "pm.test('✅ Role populated with permissions', () => pm.expect(r.data.role.permissions).to.be.an('array'));",
+            "pm.test('✅ AssignedDevices array', () => pm.expect(r.data.assignedDevices).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "[SA] PUT /users/:id — Update",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Updated Test Operator\",\n  \"phone\": \"+91 9999999999\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users/{{testUserId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{testUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Name updated', () => pm.expect(r.data.name).to.eql('Updated Test Operator'));",
+            "pm.test('✅ Phone updated', () => pm.expect(r.data.phone).to.eql('+91 9999999999'));"
+          ]}}]
+        },
+        {
+          "name": "[SA] POST /users/:id/devices — Assign CS001 + CS002",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceIds\": [\"{{cs001ObjectId}}\", \"{{cs002ObjectId}}\"]\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users/{{testUserId}}/devices", "host": ["{{baseUrl}}"], "path": ["users", "{{testUserId}}", "devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Devices assigned', () => {",
+            "  pm.expect(r.data.assignedDevices).to.be.an('array');",
+            "  pm.expect(r.data.assignedDevices.length).to.be.at.least(2);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] DELETE /users/:id/devices — Remove CS002",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceIds\": [\"{{cs002ObjectId}}\"]\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users/{{testUserId}}/devices", "host": ["{{baseUrl}}"], "path": ["users", "{{testUserId}}", "devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Device removed', () => {",
+            "  const ids = r.data.assignedDevices.map(d => d._id);",
+            "  pm.expect(ids).to.not.include(pm.environment.get('cs002ObjectId'));",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] PATCH /users/:id/deactivate",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users/{{testUserId}}/deactivate", "host": ["{{baseUrl}}"], "path": ["users", "{{testUserId}}", "deactivate"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ isActive is false', () => pm.expect(r.data.isActive).to.be.false);"
+          ]}}]
+        },
+        {
+          "name": "[SA] PATCH /users/:id/activate",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users/{{testUserId}}/activate", "host": ["{{baseUrl}}"], "path": ["users", "{{testUserId}}", "activate"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ isActive is true', () => pm.expect(r.data.isActive).to.be.true);"
+          ]}}]
+        },
+        {
+          "name": "[ERR] POST /users — Duplicate Email → 409",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Duplicate\",\n  \"email\": \"superadmin@coldstorage.com\",\n  \"password\": \"Admin@1234\",\n  \"role\": \"viewer\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 409', () => pm.response.to.have.status(409));",
+            "pm.test('✅ Email conflict error', () => pm.expect(pm.response.json().message).to.include('already registered'));"
+          ]}}]
+        },
+        {
+          "name": "[ERR] POST /users — Weak Password → 400",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Weak Pass\",\n  \"email\": \"weakpass@test.com\",\n  \"password\": \"simple\",\n  \"role\": \"viewer\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('✅ Password validation error', () => {",
+            "  const r = pm.response.json();",
+            "  pm.expect(r.errors.some(e => e.field === 'password')).to.be.true;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] DELETE /users/:id — Cleanup",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users/{{testUserId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{testUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "5. Sensor Readings",
+      "item": [
+        {
+          "name": "[OP] POST /sensors — Normal Reading CS001 (T=5.4)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS001\",\n  \"temperature\": 5.4,\n  \"humidity\": 88,\n  \"doorStatus\": \"closed\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Reading stored', () => {",
+            "  pm.expect(r.data.reading.temperature).to.eql(5.4);",
+            "  pm.expect(r.data.reading.humidity).to.eql(88);",
+            "  pm.expect(r.data.reading.doorStatus).to.eql('closed');",
+            "  pm.expect(r.data.reading.deviceId).to.eql('CS001');",
+            "});",
+            "pm.test('✅ No alerts (within potato range 2-8°C)', () => pm.expect(r.data.alertsGenerated).to.eql(0));"
+          ]}}]
+        },
+        {
+          "name": "[OP] POST /sensors — Normal Reading CS002 (T=2.5)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS002\",\n  \"temperature\": 2.5,\n  \"humidity\": 70,\n  \"doorStatus\": \"closed\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ No alerts (within onion range 0-5°C)', () => pm.expect(pm.response.json().data.alertsGenerated).to.eql(0));"
+          ]}}]
+        },
+        {
+          "name": "[OP] POST /sensors — Temperature HIGH Alert CS001 (T=15.8 > max 8)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS001\",\n  \"temperature\": 15.8,\n  \"humidity\": 88,\n  \"doorStatus\": \"closed\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Alert generated', () => pm.expect(r.data.alertsGenerated).to.be.at.least(1));",
+            "pm.test('✅ Alert type is temperature_high', () => {",
+            "  const a = r.data.alerts.find(x => x.alertType === 'temperature_high');",
+            "  pm.expect(a).to.exist;",
+            "  pm.expect(a.severity).to.eql('high');",
+            "  pm.expect(a.value).to.eql(15.8);",
+            "  pm.expect(a.threshold).to.eql(8);",
+            "});",
+            "if (r.data.alerts.length > 0) pm.environment.set('alertId', r.data.alerts[0]._id);"
+          ]}}]
+        },
+        {
+          "name": "[OP] POST /sensors — Temperature LOW Alert CS001 (T=0.5 < min 2)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS001\",\n  \"temperature\": 0.5,\n  \"humidity\": 88,\n  \"doorStatus\": \"closed\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Low temp alert generated', () => {",
+            "  const a = r.data.alerts.find(x => x.alertType === 'temperature_low');",
+            "  pm.expect(a).to.exist;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[OP] POST /sensors — Humidity HIGH Alert CS001 (H=97 > max 95)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS001\",\n  \"temperature\": 5.0,\n  \"humidity\": 97,\n  \"doorStatus\": \"closed\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Humidity high alert generated', () => {",
+            "  const a = r.data.alerts.find(x => x.alertType === 'humidity_high');",
+            "  pm.expect(a).to.exist;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[OP] POST /sensors — Humidity LOW Alert CS001 (H=80 < min 85)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS001\",\n  \"temperature\": 5.0,\n  \"humidity\": 80,\n  \"doorStatus\": \"closed\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Humidity low alert generated', () => {",
+            "  const a = r.data.alerts.find(x => x.alertType === 'humidity_low');",
+            "  pm.expect(a).to.exist;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[OP] POST /sensors — Door OPEN CS001",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS001\",\n  \"temperature\": 5.4,\n  \"humidity\": 88,\n  \"doorStatus\": \"open\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ doorStatus is open', () => pm.expect(r.data.reading.doorStatus).to.eql('open'));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /sensors/:deviceId/latest",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sensors/CS001/latest", "host": ["{{baseUrl}}"], "path": ["sensors", "CS001", "latest"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Has latest reading', () => {",
+            "  pm.expect(r.data).to.have.property('temperature');",
+            "  pm.expect(r.data).to.have.property('humidity');",
+            "  pm.expect(r.data).to.have.property('doorStatus');",
+            "  pm.expect(r.data).to.have.property('timestamp');",
+            "  pm.expect(r.data.deviceId).to.eql('CS001');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /sensors/:deviceId/history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sensors/CS001/history?page=1&limit=10&startDate=2026-01-01&endDate=2026-12-31", "host": ["{{baseUrl}}"], "path": ["sensors", "CS001", "history"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"10"},{"key":"startDate","value":"2026-01-01"},{"key":"endDate","value":"2026-12-31"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Historical data returned', () => {",
+            "  pm.expect(r.data).to.be.an('array');",
+            "  pm.expect(r.meta.pagination.total).to.be.at.least(1);",
+            "});",
+            "pm.test('✅ Sorted descending by timestamp', () => {",
+            "  if (r.data.length > 1) {",
+            "    const t1 = new Date(r.data[0].timestamp).getTime();",
+            "    const t2 = new Date(r.data[1].timestamp).getTime();",
+            "    pm.expect(t1).to.be.at.least(t2);",
+            "  }",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /sensors/:deviceId/stats — 24h",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sensors/CS001/stats?hours=24", "host": ["{{baseUrl}}"], "path": ["sensors", "CS001", "stats"], "query": [{"key":"hours","value":"24"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Stats object returned', () => {",
+            "  pm.expect(r.data).to.have.property('avgTemp');",
+            "  pm.expect(r.data).to.have.property('minTemp');",
+            "  pm.expect(r.data).to.have.property('maxTemp');",
+            "  pm.expect(r.data).to.have.property('avgHumidity');",
+            "  pm.expect(r.data).to.have.property('count');",
+            "  pm.expect(r.data.count).to.be.at.least(1);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[ERR] POST /sensors — Device Not Found → 404",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"NOTEXIST\",\n  \"temperature\": 5.0,\n  \"humidity\": 80,\n  \"doorStatus\": \"closed\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 404', () => pm.response.to.have.status(404));"
+          ]}}]
+        },
+        {
+          "name": "[ERR] POST /sensors — Temperature Out of Range → 400",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS001\",\n  \"temperature\": 999,\n  \"humidity\": 80,\n  \"doorStatus\": \"closed\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('✅ Temperature validation error', () => {",
+            "  pm.expect(pm.response.json().errors.some(e => e.field === 'temperature')).to.be.true;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[ERR] POST /sensors — Missing doorStatus → 400",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS001\",\n  \"temperature\": 5.0,\n  \"humidity\": 80\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 400', () => pm.response.to.have.status(400));",
+            "pm.test('✅ doorStatus error', () => pm.expect(pm.response.json().errors.some(e => e.field === 'doorStatus')).to.be.true);"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "6. Alerts",
+      "item": [
+        {
+          "name": "[SA] GET /alerts — All Active",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts?page=1&limit=20&status=active", "host": ["{{baseUrl}}"], "path": ["alerts"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"20"},{"key":"status","value":"active"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Active alerts exist from sensor tests', () => pm.expect(r.meta.pagination.total).to.be.at.least(1));",
+            "pm.test('✅ Device populated', () => pm.expect(r.data[0].device).to.have.property('deviceId'));",
+            "pm.test('✅ Required alert fields', () => {",
+            "  const a = r.data[0];",
+            "  pm.expect(a).to.have.property('alertType');",
+            "  pm.expect(a).to.have.property('severity');",
+            "  pm.expect(a).to.have.property('message');",
+            "  pm.expect(a).to.have.property('status');",
+            "  pm.expect(a.status).to.eql('active');",
+            "});",
+            "if (r.data.length > 0) pm.environment.set('alertId', r.data[0]._id);"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /alerts — Filter severity=high",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts?severity=high&status=active", "host": ["{{baseUrl}}"], "path": ["alerts"], "query": [{"key":"severity","value":"high"},{"key":"status","value":"active"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All alerts are high severity', () => r.data.forEach(a => pm.expect(a.severity).to.eql('high')));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /alerts — Filter alertType=temperature_high",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts?alertType=temperature_high", "host": ["{{baseUrl}}"], "path": ["alerts"], "query": [{"key":"alertType","value":"temperature_high"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All results are temperature_high', () => r.data.forEach(a => pm.expect(a.alertType).to.eql('temperature_high')));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /alerts — Filter deviceId=CS001",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts?deviceId=CS001", "host": ["{{baseUrl}}"], "path": ["alerts"], "query": [{"key":"deviceId","value":"CS001"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All alerts belong to CS001', () => r.data.forEach(a => pm.expect(a.deviceId).to.eql('CS001')));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /alerts — Date Range Filter",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts?startDate=2026-01-01&endDate=2026-12-31", "host": ["{{baseUrl}}"], "path": ["alerts"], "query": [{"key":"startDate","value":"2026-01-01"},{"key":"endDate","value":"2026-12-31"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Date range returns results', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /alerts/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts/{{alertId}}", "host": ["{{baseUrl}}"], "path": ["alerts", "{{alertId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Alert ID matches', () => pm.expect(r.data._id).to.eql(pm.environment.get('alertId')));",
+            "pm.test('✅ Device populated', () => pm.expect(r.data.device).to.have.property('deviceId'));"
+          ]}}]
+        },
+        {
+          "name": "[OP] PATCH /alerts/:id/acknowledge",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts/{{alertId}}/acknowledge", "host": ["{{baseUrl}}"], "path": ["alerts", "{{alertId}}", "acknowledge"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Status is acknowledged', () => pm.expect(r.data.status).to.eql('acknowledged'));",
+            "pm.test('✅ acknowledgedBy set', () => pm.expect(r.data.acknowledgedBy).to.not.be.null);",
+            "pm.test('✅ acknowledgedAt set', () => pm.expect(r.data.acknowledgedAt).to.be.a('string'));"
+          ]}}]
+        },
+        {
+          "name": "[SA] PATCH /alerts/:id/resolve",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts/{{alertId}}/resolve", "host": ["{{baseUrl}}"], "path": ["alerts", "{{alertId}}", "resolve"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Status is resolved', () => pm.expect(r.data.status).to.eql('resolved'));",
+            "pm.test('✅ resolvedBy set', () => pm.expect(r.data.resolvedBy).to.not.be.null);"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /alerts — Get new active alert for delete test",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts?status=active&limit=1", "host": ["{{baseUrl}}"], "path": ["alerts"], "query": [{"key":"status","value":"active"},{"key":"limit","value":"1"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "const r = pm.response.json();",
+            "if (r.data.length > 0) pm.environment.set('alertId', r.data[0]._id);"
+          ]}}]
+        },
+        {
+          "name": "[SA] DELETE /alerts/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts/{{alertId}}", "host": ["{{baseUrl}}"], "path": ["alerts", "{{alertId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Deleted', () => pm.expect(pm.response.json().success).to.be.true);"
+          ]}}]
+        },
+        {
+          "name": "[ERR] GET /alerts/:id — Not Found → 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts/507f1f77bcf86cd799439011", "host": ["{{baseUrl}}"], "path": ["alerts", "507f1f77bcf86cd799439011"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 404', () => pm.response.to.have.status(404));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "7. Dashboard",
+      "item": [
+        {
+          "name": "[SA] GET /dashboard/summary — Full (all devices)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/summary", "host": ["{{baseUrl}}"], "path": ["dashboard", "summary"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Has devices section', () => {",
+            "  pm.expect(r.data.devices).to.have.all.keys('total','online','offline','maintenance');",
+            "  pm.expect(r.data.devices.total).to.be.at.least(5);",
+            "});",
+            "pm.test('✅ Has users section (SA only)', () => {",
+            "  pm.expect(r.data.users).to.have.all.keys('total','active');",
+            "});",
+            "pm.test('✅ Has alerts section', () => {",
+            "  pm.expect(r.data.alerts).to.have.property('active');",
+            "  pm.expect(r.data.alerts.active).to.be.a('number');",
+            "});",
+            "console.log('Summary:', JSON.stringify(r.data, null, 2));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /dashboard/device-health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/device-health", "host": ["{{baseUrl}}"], "path": ["dashboard", "device-health"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Returns array of devices', () => pm.expect(r.data).to.be.an('array'));",
+            "pm.test('✅ Each device has health info', () => {",
+            "  r.data.forEach(d => {",
+            "    pm.expect(d).to.have.property('deviceId');",
+            "    pm.expect(d).to.have.property('status');",
+            "    pm.expect(d).to.have.property('stats');",
+            "  });",
+            "});",
+            "pm.test('✅ CS001 has sensor stats', () => {",
+            "  const cs001 = r.data.find(d => d.deviceId === 'CS001');",
+            "  pm.expect(cs001).to.exist;",
+            "  pm.expect(cs001.stats).to.not.be.null;",
+            "  pm.expect(cs001.stats.readingsCount).to.be.at.least(1);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /dashboard/temperature-overview — 24h",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/temperature-overview?hours=24", "host": ["{{baseUrl}}"], "path": ["dashboard", "temperature-overview"], "query": [{"key":"hours","value":"24"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Returns array per device', () => pm.expect(r.data).to.be.an('array'));",
+            "pm.test('✅ Stats fields present', () => {",
+            "  if (r.data.length > 0) {",
+            "    pm.expect(r.data[0]).to.have.property('avgTemp');",
+            "    pm.expect(r.data[0]).to.have.property('minTemp');",
+            "    pm.expect(r.data[0]).to.have.property('maxTemp');",
+            "    pm.expect(r.data[0]).to.have.property('count');",
+            "  }",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /dashboard/temperature-overview — 48h",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/temperature-overview?hours=48", "host": ["{{baseUrl}}"], "path": ["dashboard", "temperature-overview"], "query": [{"key":"hours","value":"48"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Returns array', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /dashboard/alerts-by-device",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/alerts-by-device", "host": ["{{baseUrl}}"], "path": ["dashboard", "alerts-by-device"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Returns array', () => pm.expect(r.data).to.be.an('array'));",
+            "pm.test('✅ Each item has deviceId and count', () => {",
+            "  r.data.forEach(item => {",
+            "    pm.expect(item).to.have.property('deviceId');",
+            "    pm.expect(item).to.have.property('count');",
+            "  });",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /dashboard/my-devices — Super Admin (no assigned devices)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/my-devices", "host": ["{{baseUrl}}"], "path": ["dashboard", "my-devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Returns array (SA has 0 assigned)', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "[OP] GET /dashboard/my-devices — Operator (CS001 + CS002 assigned)",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/my-devices", "host": ["{{baseUrl}}"], "path": ["dashboard", "my-devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Operator sees their 2 devices', () => pm.expect(r.data.length).to.eql(2));",
+            "pm.test('✅ CS001 is in list', () => pm.expect(r.data.some(d => d.deviceId === 'CS001')).to.be.true);",
+            "pm.test('✅ CS002 is in list', () => pm.expect(r.data.some(d => d.deviceId === 'CS002')).to.be.true);",
+            "pm.test('✅ Stats populated for CS001', () => {",
+            "  const cs001 = r.data.find(d => d.deviceId === 'CS001');",
+            "  pm.expect(cs001.stats).to.not.be.null;",
+            "});"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "8. RBAC & Access Control",
+      "item": [
+        {
+          "name": "── SETUP: SA assigns CS003 to Viewer ──",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceIds\": [\"{{cs003ObjectId}}\"]\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users/{{viewerUserId}}/devices", "host": ["{{baseUrl}}"], "path": ["users", "{{viewerUserId}}", "devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200 — CS003 assigned to Viewer', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Viewer now has CS003', () => {",
+            "  const r = pm.response.json();",
+            "  pm.expect(r.data.assignedDevices.some(d => d.deviceId === 'CS003')).to.be.true;",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "── OPERATOR TESTS ──────────────────────",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{baseUrl}}/health", "host": ["{{baseUrl}}"], "path": ["health"] } },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Operator section start', () => pm.response.to.have.status(200));"] }}]
+        },
+        {
+          "name": "[OP] GET /devices — Sees only CS001 + CS002",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices?limit=20", "host": ["{{baseUrl}}"], "path": ["devices"], "query": [{"key":"limit","value":"20"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Operator sees exactly 2 devices', () => pm.expect(r.data.length).to.eql(2));",
+            "pm.test('✅ CS001 present', () => pm.expect(r.data.some(d => d.deviceId === 'CS001')).to.be.true);",
+            "pm.test('✅ CS002 present', () => pm.expect(r.data.some(d => d.deviceId === 'CS002')).to.be.true);",
+            "pm.test('✅ CS003 NOT present', () => pm.expect(r.data.some(d => d.deviceId === 'CS003')).to.be.false);"
+          ]}}]
+        },
+        {
+          "name": "[OP] GET /devices/:cs001Id — Assigned → 200",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/{{cs001ObjectId}}", "host": ["{{baseUrl}}"], "path": ["devices", "{{cs001ObjectId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200 — CS001 is assigned to operator', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Returns CS001', () => pm.expect(pm.response.json().data.deviceId).to.eql('CS001'));"
+          ]}}]
+        },
+        {
+          "name": "[OP] GET /devices/:cs003Id — NOT Assigned → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/{{cs003ObjectId}}", "host": ["{{baseUrl}}"], "path": ["devices", "{{cs003ObjectId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 403 — CS003 not assigned to operator', () => pm.response.to.have.status(403));",
+            "pm.test('✅ Forbidden message', () => pm.expect(pm.response.json().message).to.include('not assigned'));"
+          ]}}]
+        },
+        {
+          "name": "[OP] GET /sensors/CS001/latest — Assigned → 200",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sensors/CS001/latest", "host": ["{{baseUrl}}"], "path": ["sensors", "CS001", "latest"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200 — Operator can read CS001 sensors', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "[OP] GET /sensors/CS003/latest — NOT Assigned → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sensors/CS003/latest", "host": ["{{baseUrl}}"], "path": ["sensors", "CS003", "latest"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 403 — CS003 not assigned to operator', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "[OP] GET /alerts — Only CS001/CS002 alerts",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts?limit=50", "host": ["{{baseUrl}}"], "path": ["alerts"], "query": [{"key":"limit","value":"50"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Only CS001/CS002 alerts visible to operator', () => {",
+            "  r.data.forEach(a => {",
+            "    pm.expect(['CS001','CS002']).to.include(a.deviceId);",
+            "  });",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[OP] GET /dashboard/summary — Filtered stats",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/summary", "host": ["{{baseUrl}}"], "path": ["dashboard", "summary"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Total devices = 2 (operator scope)', () => pm.expect(r.data.devices.total).to.eql(2));",
+            "pm.test('✅ No users/vegetables section (restricted role)', () => {",
+            "  pm.expect(r.data).to.not.have.property('users');",
+            "  pm.expect(r.data).to.not.have.property('vegetables');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[OP] POST /devices — Cannot Create → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CSOP_TEST\",\n  \"name\": \"Operator Created\",\n  \"location\": \"X\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/devices", "host": ["{{baseUrl}}"], "path": ["devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 403 — Operator cannot create devices', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "[OP] DELETE /devices/:id — Cannot Delete → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/{{cs001ObjectId}}", "host": ["{{baseUrl}}"], "path": ["devices", "{{cs001ObjectId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 403 — Operator cannot delete devices', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "── VIEWER TESTS ─────────────────────────",
+          "request": { "method": "GET", "header": [], "url": { "raw": "{{healthUrl}}/health", "host": ["{{healthUrl}}"], "path": ["health"] } },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Viewer section start', () => pm.response.to.have.status(200));"] }}]
+        },
+        {
+          "name": "[VW] GET /devices — Sees only CS003",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices?limit=20", "host": ["{{baseUrl}}"], "path": ["devices"], "query": [{"key":"limit","value":"20"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Viewer sees exactly 1 device (CS003)', () => pm.expect(r.data.length).to.eql(1));",
+            "pm.test('✅ That device is CS003', () => pm.expect(r.data[0].deviceId).to.eql('CS003'));"
+          ]}}]
+        },
+        {
+          "name": "[VW] GET /devices/:cs003Id — Assigned → 200",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/{{cs003ObjectId}}", "host": ["{{baseUrl}}"], "path": ["devices", "{{cs003ObjectId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200 — Viewer can access assigned CS003', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+        {
+          "name": "[VW] GET /devices/:cs001Id — NOT Assigned → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/{{cs001ObjectId}}", "host": ["{{baseUrl}}"], "path": ["devices", "{{cs001ObjectId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 403 — CS001 not assigned to viewer', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "[VW] GET /sensors/CS003/latest — Assigned → 200",
+          "event": [
+            { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+              "// First ingest a reading for CS003 using SA token so viewer has data",
+              "pm.sendRequest({",
+              "  url: pm.environment.get('baseUrl') + '/sensors',",
+              "  method: 'POST',",
+              "  header: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + pm.environment.get('superAdminToken') },",
+              "  body: { mode: 'raw', raw: JSON.stringify({ deviceId: 'CS003', temperature: 10.0, humidity: 88, doorStatus: 'closed' }) }",
+              "}, (err, res) => { if (err) console.log('Prereq error:', err); });"
+            ]}},
+            { "listen": "test", "script": { "type": "text/javascript", "exec": [
+              "pm.test('✅ Status 200 — Viewer can read CS003 sensors', () => pm.response.to.have.status(200));"
+            ]}}
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sensors/CS003/latest", "host": ["{{baseUrl}}"], "path": ["sensors", "CS003", "latest"] }
+          }
+        },
+        {
+          "name": "[VW] GET /sensors/CS001/latest — NOT Assigned → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sensors/CS001/latest", "host": ["{{baseUrl}}"], "path": ["sensors", "CS001", "latest"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 403 — CS001 not assigned to viewer', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "[VW] POST /sensors — Cannot Ingest → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS003\",\n  \"temperature\": 10.0,\n  \"humidity\": 88,\n  \"doorStatus\": \"closed\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 403 — Viewer cannot ingest sensor data', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "[VW] POST /users — Cannot Create Users → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Viewer Created\",\n  \"email\": \"v@test.com\",\n  \"password\": \"Test@1234\",\n  \"role\": \"viewer\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 403 — Viewer cannot create users', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+        {
+          "name": "[VW] GET /alerts — Only CS003 alerts",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts?limit=50", "host": ["{{baseUrl}}"], "path": ["alerts"], "query": [{"key":"limit","value":"50"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Viewer only sees CS003 alerts', () => {",
+            "  r.data.forEach(a => pm.expect(a.deviceId).to.eql('CS003'));",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[VW] GET /dashboard/summary — Filtered to CS003 only",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{viewerToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/summary", "host": ["{{baseUrl}}"], "path": ["dashboard", "summary"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Total devices = 1 (viewer scope)', () => pm.expect(r.data.devices.total).to.eql(1));",
+            "pm.test('✅ No users/vegetables in viewer response', () => {",
+            "  pm.expect(r.data).to.not.have.property('users');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "── CLEANUP: SA removes CS003 from Viewer ──",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceIds\": [\"{{cs003ObjectId}}\"]\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users/{{viewerUserId}}/devices", "host": ["{{baseUrl}}"], "path": ["users", "{{viewerUserId}}", "devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200 — CS003 removed from Viewer', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    }
+  ]
+}
