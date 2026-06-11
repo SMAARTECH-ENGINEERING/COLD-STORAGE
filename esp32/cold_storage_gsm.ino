@@ -8,7 +8,6 @@
 #include <TinyGsmClient.h>
 #include <ArduinoHttpClient.h>
 #include <ArduinoJson.h>
-#include <SSLClient.h>
 #ifdef U8X8_HAVE_HW_SPI
 #include <SPI.h>
 #endif
@@ -22,16 +21,12 @@ const char APN[]      = "airtelgprs.com";
 const char APN_USER[] = "";
 const char APN_PASS[] = "";
 
-// Render free-tier URL  (no https:// prefix — TinyGSM adds that via port 443)
+// Render backend — port 443 HTTPS via modem built-in SSL
 const char SERVER_HOST[] = "cold-storage-2.onrender.com";
 const int  SERVER_PORT   = 443;
 
 // Must match a deviceId registered in the backend DB
 const char DEVICE_ID[] = "CS001";
-
-// Operator account created in backend (role: operator)
-const char IOT_EMAIL[]    = "operator@coldstorage.com";
-const char IOT_PASSWORD[] = "Operator@1234";
 
 // ============================================================================
 // PIN ASSIGNMENTS (ESP32)
@@ -48,33 +43,26 @@ const char IOT_PASSWORD[] = "Operator@1234";
 
 // ============================================================================
 // NTC THERMISTOR  (10 kΩ, B=3950, pull-up to 3.3 V via 10 kΩ)
-//   Remove this block and set g_temp manually if you use a digital T sensor.
 // ============================================================================
-#define NTC_NOMINAL_R   10000.0f   // Resistance at 25 °C
-#define NTC_BCOEFF      3950.0f    // Beta coefficient
-#define NTC_SERIES_R    10000.0f   // Series resistor value
-#define NTC_NOMINAL_T   298.15f    // 25 °C in Kelvin
-#define ADC_MAX         4095.0f    // ESP32 12-bit ADC
+#define NTC_NOMINAL_R   10000.0f
+#define NTC_BCOEFF      3950.0f
+#define NTC_SERIES_R    10000.0f
+#define NTC_NOMINAL_T   298.15f
+#define ADC_MAX         4095.0f
 
-// Cold-storage typical humidity used as SGP40 compensation default.
-// Replace with actual sensor reading when a humidity sensor is wired.
 #define HUMIDITY_DEFAULT  85.0f
 
 // ============================================================================
 // TIMING
 // ============================================================================
-#define SENSOR_POST_MS       30000UL           // POST every 30 s
-#define TOKEN_REFRESH_MS     (13UL * 60 * 1000) // Refresh at 13 min (server expires at 15 min)
+#define SENSOR_POST_MS       30000UL
 #define GSM_WAIT_TIMEOUT_MS  60000UL
-#define HTTP_TIMEOUT_MS      90000  // Render free tier cold-start can take ~50-80 s
+// 100 s — Render free tier cold start can take 50–80 s
+#define HTTP_TIMEOUT_MS      100000
 
 // ============================================================================
 // GLOBAL STATE
 // ============================================================================
-char     g_accessToken[512]  = "";
-char     g_refreshToken[512] = "";
-uint32_t g_tokenAt           = 0;
-
 float    g_temp       = 0.0f;
 float    g_humidity   = HUMIDITY_DEFAULT;
 int32_t  g_vocIndex   = 0;
@@ -91,23 +79,21 @@ uint32_t g_lastRender = 0;
 HardwareSerial gsmSerial(2);
 TinyGsm        modem(gsmSerial);
 
-TinyGsmClient  gsmTransport(modem);   // raw TCP over the modem
-SSLClient      gsmClient(&gsmTransport);  // TLS done on the ESP32
+// TinyGsmClientSecure uses the SIM7600's built-in SSL/TLS hardware —
+// no SSLClient library or trust-anchor certificates needed on the ESP32.
+TinyGsmClientSecure gsmClient(modem);
 
-HttpClient     http(gsmClient, SERVER_HOST, SERVER_PORT);
+HttpClient http(gsmClient, SERVER_HOST, SERVER_PORT);
 
 Adafruit_SGP40 sgp40;
 
-// SSD1306 128×64 I2C — change constructor if your panel differs
 U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0, U8X8_PIN_NONE);
 
 // ============================================================================
 // FORWARD DECLARATIONS
 // ============================================================================
 bool   gsmConnect();
-bool   jwtLogin();
-bool   jwtRefresh();
-bool   ensureToken();
+bool   wakeServer();
 bool   postReading();
 void   readSensors();
 float  readNTC();
@@ -126,7 +112,7 @@ void setup() {
     pinMode(PIN_DOOR,       INPUT_PULLUP);
     pinMode(PIN_COMPRESSOR, INPUT);
     pinMode(PIN_LED,        OUTPUT);
-    analogReadResolution(12);   // ESP32 12-bit ADC
+    analogReadResolution(12);
     digitalWrite(PIN_LED, LOW);
 
     Wire.begin(21, 22);
@@ -152,7 +138,7 @@ void setup() {
     oledMsg("GSM Modem", "Restarting...");
     Serial.println(F("[GSM] Modem restart"));
     modem.restart();
-    delay(8000);   // SIM7600 cold-start needs ~8 s
+    delay(8000);
 
     Serial.print(F("[GSM] Model: "));  Serial.println(modem.getModemInfo());
     Serial.print(F("[GSM] IMEI:  "));  Serial.println(modem.getIMEI());
@@ -168,14 +154,9 @@ void setup() {
         if (i == 5) { Serial.println(F("[GSM] Giving up — reboot")); ESP.restart(); }
     }
 
-    // ---- JWT login (3 attempts) ---------------------------------------------
-    oledMsg("Backend", "Authenticating...");
-    for (uint8_t i = 1; i <= 3; i++) {
-        if (jwtLogin()) break;
-        Serial.printf("[AUTH] Attempt %u/3 failed — wait 30 s\n", i);
-        delay(30000);
-        if (i == 3) { Serial.println(F("[AUTH] Giving up — reboot")); ESP.restart(); }
-    }
+    // ---- Wake Render server (free tier sleeps after 15 min) -----------------
+    oledMsg("Server", "Waking up...");
+    wakeServer();
 
     readSensors();
     renderOLED();
@@ -189,15 +170,6 @@ void setup() {
 void loop() {
     uint32_t now = millis();
 
-    // ---- JWT token refresh --------------------------------------------------
-    if (strlen(g_accessToken) > 0 && (now - g_tokenAt) >= TOKEN_REFRESH_MS) {
-        Serial.println(F("[AUTH] Token refresh due"));
-        if (!jwtRefresh()) {
-            Serial.println(F("[AUTH] Refresh failed — re-login"));
-            jwtLogin();
-        }
-    }
-
     // ---- GPRS watchdog ------------------------------------------------------
     if (!modem.isGprsConnected()) {
         Serial.println(F("[GSM] GPRS lost — reconnecting"));
@@ -209,7 +181,6 @@ void loop() {
     if ((now - g_lastPost) >= SENSOR_POST_MS) {
         g_lastPost = now;
         readSensors();
-        ensureToken();
         g_netOK = postReading();
         blinkLED(g_netOK ? 1 : 3, g_netOK ? 150 : 80);
     }
@@ -245,135 +216,52 @@ bool gsmConnect() {
 }
 
 // ============================================================================
-// JWT LOGIN  →  POST /api/v1/auth/login
+// WAKE SERVER  —  GET /health to force Render out of sleep before first POST.
+//   Render free tier spins down after 15 min. First request wakes it (50–80 s).
 // ============================================================================
-bool jwtLogin() {
-    Serial.println(F("[AUTH] POST /api/v1/auth/login"));
-
-    StaticJsonDocument<192> req;
-    req["email"]    = IOT_EMAIL;
-    req["password"] = IOT_PASSWORD;
-    char reqBody[192];
-    serializeJson(req, reqBody, sizeof(reqBody));
-
+bool wakeServer() {
+    Serial.println(F("[WAKE] GET /health (Render cold-start may take ~80 s)"));
     http.setTimeout(HTTP_TIMEOUT_MS);
     http.beginRequest();
-    http.post("/api/v1/auth/login");
-    http.sendHeader("Content-Type", "application/json");
-    http.sendHeader("Content-Length", (int)strlen(reqBody));
-    http.beginBody();
-    http.print(reqBody);
+    http.get("/health");
+    http.sendHeader("Connection", "close");
     http.endRequest();
 
-    int    code = http.responseStatusCode();
-    String body = http.responseBody();
-    Serial.printf("[AUTH] Login → HTTP %d\n", code);
-    if (code != 200) return false;
-
-    // Two JWTs + user object in response — 2048 bytes covers it
-    DynamicJsonDocument resp(2048);
-    if (deserializeJson(resp, body) != DeserializationError::Ok) {
-        Serial.println(F("[AUTH] JSON parse error"));
-        return false;
-    }
-    if (!resp["success"].as<bool>()) return false;
-
-    const char* at = resp["data"]["accessToken"];
-    const char* rt = resp["data"]["refreshToken"];
-    if (!at || !rt) return false;
-
-    strlcpy(g_accessToken,  at, sizeof(g_accessToken));
-    strlcpy(g_refreshToken, rt, sizeof(g_refreshToken));
-    g_tokenAt = millis();
-
-    Serial.println(F("[AUTH] Login OK — token valid 15 min"));
-    return true;
-}
-
-// ============================================================================
-// JWT REFRESH  →  POST /api/v1/auth/refresh-token
-// ============================================================================
-bool jwtRefresh() {
-    if (strlen(g_refreshToken) == 0) return false;
-    Serial.println(F("[AUTH] POST /api/v1/auth/refresh-token"));
-
-    StaticJsonDocument<512> req;
-    req["refreshToken"] = g_refreshToken;
-    char reqBody[512];
-    serializeJson(req, reqBody, sizeof(reqBody));
-
-    http.setTimeout(HTTP_TIMEOUT_MS);
-    http.beginRequest();
-    http.post("/api/v1/auth/refresh-token");
-    http.sendHeader("Content-Type", "application/json");
-    http.sendHeader("Content-Length", (int)strlen(reqBody));
-    http.beginBody();
-    http.print(reqBody);
-    http.endRequest();
-
-    int    code = http.responseStatusCode();
-    String body = http.responseBody();
-    if (code != 200) return false;
-
-    DynamicJsonDocument resp(1536);
-    if (deserializeJson(resp, body) != DeserializationError::Ok) return false;
-    if (!resp["success"].as<bool>()) return false;
-
-    const char* at = resp["data"]["accessToken"];
-    if (!at) return false;
-    strlcpy(g_accessToken, at, sizeof(g_accessToken));
-    g_tokenAt = millis();
-
-    // Server may issue a rotated refresh token
-    const char* rt = resp["data"]["refreshToken"];
-    if (rt) strlcpy(g_refreshToken, rt, sizeof(g_refreshToken));
-
-    Serial.println(F("[AUTH] Refresh OK"));
-    return true;
-}
-
-bool ensureToken() {
-    if (strlen(g_accessToken) > 0) return true;
-    return jwtLogin();
+    int code = http.responseStatusCode();
+    http.responseBody();  // flush
+    Serial.printf("[WAKE] /health → HTTP %d\n", code);
+    return (code == 200);
 }
 
 // ============================================================================
 // NTC THERMISTOR TEMPERATURE READ (GPIO36 / ADC)
-//   Steinhart-Hart simplified (B-parameter equation)
 //   Wiring: 3.3V → 10kΩ resistor → GPIO36 → 10kΩ NTC → GND
 // ============================================================================
 float readNTC() {
-    // Average 8 samples for noise rejection
     uint32_t raw = 0;
     for (uint8_t i = 0; i < 8; i++) { raw += analogRead(PIN_TEMP_ADC); delay(2); }
     float adcVal = raw / 8.0f;
 
-    if (adcVal <= 0 || adcVal >= ADC_MAX) return g_temp;  // open/short circuit guard
+    if (adcVal <= 0 || adcVal >= ADC_MAX) return g_temp;
 
     float resistance = NTC_SERIES_R * (ADC_MAX / adcVal - 1.0f);
     float steinhart  = log(resistance / NTC_NOMINAL_R) / NTC_BCOEFF;
     steinhart       += 1.0f / NTC_NOMINAL_T;
-    return (1.0f / steinhart) - 273.15f;   // Kelvin → °C
+    return (1.0f / steinhart) - 273.15f;
 }
 
 // ============================================================================
 // SENSOR READING
 // ============================================================================
 void readSensors() {
-    // Temperature via NTC (no external library needed)
     float t = readNTC();
-    if (t > -40.0f && t < 85.0f) g_temp = t;   // sanity range
+    if (t > -40.0f && t < 85.0f) g_temp = t;
 
-    // Humidity: fixed cold-storage default (wire SHT31/DHT22 here when available)
     g_humidity = HUMIDITY_DEFAULT;
 
-    // SGP40 VOC index 0–500  (100 = clean air baseline)
     g_vocIndex = sgp40.measureVocIndex(g_temp, g_humidity);
 
-    // Reed switch: INPUT_PULLUP — HIGH = door open (magnet away)
     g_doorOpen   = (digitalRead(PIN_DOOR) == HIGH);
-
-    // Compressor sense line
     g_compressor = (digitalRead(PIN_COMPRESSOR) == HIGH);
 
     Serial.printf("[SENSOR] T=%.2f°C  H=%.0f%%  VOC=%d  Door=%s  Comp=%s\n",
@@ -383,52 +271,39 @@ void readSensors() {
 }
 
 // ============================================================================
-// POST SENSOR DATA  →  POST /api/v1/sensors
-//   Field names match backend flexible ingest (camelCase accepted)
+// POST SENSOR DATA  →  POST /api/v1/sensors  (no auth required)
 // ============================================================================
 bool postReading() {
-    if (strlen(g_accessToken) == 0) return false;
-
     StaticJsonDocument<256> payload;
     payload["deviceId"]   = DEVICE_ID;
-    payload["temp"]       = g_temp;       // °C
-    payload["hum"]        = g_humidity;   // %RH
-    payload["door"]       = g_doorOpen;   // true = open
-    payload["voc"]        = g_vocIndex;   // 0–500
-    payload["compressor"] = g_compressor; // true = running
+    payload["temp"]       = g_temp;
+    payload["hum"]        = g_humidity;
+    payload["door"]       = g_doorOpen;
+    payload["voc"]        = g_vocIndex;
+    payload["compressor"] = g_compressor;
 
     char body[256];
     serializeJson(payload, body, sizeof(body));
-
-    // "Bearer <token>" — token up to 511 chars + 7 prefix + null
-    char authHdr[520];
-    snprintf(authHdr, sizeof(authHdr), "Bearer %s", g_accessToken);
 
     http.setTimeout(HTTP_TIMEOUT_MS);
     http.beginRequest();
     http.post("/api/v1/sensors");
     http.sendHeader("Content-Type",  "application/json");
     http.sendHeader("Content-Length", (int)strlen(body));
-    http.sendHeader("Authorization",  authHdr);
+    http.sendHeader("Connection",    "close");
     http.beginBody();
     http.print(body);
     http.endRequest();
 
     int code = http.responseStatusCode();
-    http.responseBody();  // flush — prevents stale data on next request
+    http.responseBody();  // flush
 
     Serial.printf("[HTTP] POST /api/v1/sensors → %d\n", code);
-
-    if (code == 401) {
-        // Token expired mid-cycle — clear forces re-login on next iteration
-        memset(g_accessToken, 0, sizeof(g_accessToken));
-        return false;
-    }
     return (code == 200 || code == 201);
 }
 
 // ============================================================================
-// OLED DISPLAY  128×64  font u8g2_font_6x10_tf → ~21 chars/row
+// OLED DISPLAY  128×64
 // ============================================================================
 void renderOLED() {
     char r1[22], r2[22], r3[22], ft[22];

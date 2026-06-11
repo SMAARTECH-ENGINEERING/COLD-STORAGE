@@ -13,9 +13,12 @@ const connectDB = async () => {
 
   try {
     const conn = await mongoose.connect(uri, {
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 5,              // Atlas M0 free tier: keep pool small
+      serverSelectionTimeoutMS: 15000,  // give Atlas time to respond on cold start
       socketTimeoutMS: 45000,
+      heartbeatFrequencyMS: 10000,
+      retryWrites: true,
+      w: 'majority',
     });
 
     logger.info(`MongoDB connected: ${conn.connection.host}`);
