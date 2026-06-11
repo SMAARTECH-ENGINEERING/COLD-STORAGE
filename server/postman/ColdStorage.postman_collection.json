@@ -89,7 +89,8 @@
             "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
             "pm.test('✅ Role is admin', () => pm.expect(r.data.user.role.name).to.eql('admin'));",
             "pm.environment.set('adminToken', r.data.accessToken);",
-            "pm.environment.set('adminRefresh', r.data.refreshToken);"
+            "pm.environment.set('adminRefresh', r.data.refreshToken);",
+            "pm.environment.set('adminId', r.data.user._id);"
           ]}}]
         },
         {
@@ -520,6 +521,32 @@
           ]}}]
         },
         {
+          "name": "[SA] GET /devices — Filter status=online",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices?status=online", "host": ["{{baseUrl}}"], "path": ["devices"], "query": [{"key":"status","value":"online"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All results are online', () => r.data.forEach(d => pm.expect(d.status).to.eql('online')));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /devices — Filter status=maintenance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices?status=maintenance", "host": ["{{baseUrl}}"], "path": ["devices"], "query": [{"key":"status","value":"maintenance"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All results are maintenance', () => r.data.forEach(d => pm.expect(d.status).to.eql('maintenance')));"
+          ]}}]
+        },
+        {
           "name": "[SA] GET /devices — Search by name",
           "request": {
             "method": "GET",
@@ -690,6 +717,33 @@
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
             "pm.test('✅ Results found', () => pm.expect(pm.response.json().data.length).to.be.at.least(1));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /users — Filter isActive=true",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users?isActive=true", "host": ["{{baseUrl}}"], "path": ["users"], "query": [{"key":"isActive","value":"true"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All returned users are active', () => r.data.forEach(u => pm.expect(u.isActive).to.be.true));",
+            "pm.test('✅ Has seeded active users', () => pm.expect(r.data.length).to.be.at.least(4));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /users — Filter isActive=false",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users?isActive=false", "host": ["{{baseUrl}}"], "path": ["users"], "query": [{"key":"isActive","value":"false"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All returned users are inactive', () => r.data.forEach(u => pm.expect(u.isActive).to.be.false));"
           ]}}]
         },
         {
@@ -1205,6 +1259,33 @@
           ]}}]
         },
         {
+          "name": "[SA] GET /alerts — Filter status=resolved",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts?status=resolved&page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["alerts"], "query": [{"key":"status","value":"resolved"},{"key":"page","value":"1"},{"key":"limit","value":"20"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All returned alerts are resolved', () => r.data.forEach(a => pm.expect(a.status).to.eql('resolved')));",
+            "pm.test('✅ At least 1 resolved alert (from resolve test)', () => pm.expect(r.meta.pagination.total).to.be.at.least(1));"
+          ]}}]
+        },
+        {
+          "name": "[SA] GET /alerts — Filter status=acknowledged",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts?status=acknowledged&page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["alerts"], "query": [{"key":"status","value":"acknowledged"},{"key":"page","value":"1"},{"key":"limit","value":"20"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All returned alerts are acknowledged', () => r.data.forEach(a => pm.expect(a.status).to.eql('acknowledged')));"
+          ]}}]
+        },
+        {
           "name": "[SA] GET /alerts — Get new active alert for delete test",
           "request": {
             "method": "GET",
@@ -1683,6 +1764,448 @@
           },
           "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
             "pm.test('✅ Status 200 — CS003 removed from Viewer', () => pm.response.to.have.status(200));"
+          ]}}]
+        }
+      ]
+    },
+
+    {
+      "name": "9. Admin Role Tests",
+      "auth": {
+        "type": "bearer",
+        "bearer": [{ "key": "token", "value": "{{adminToken}}", "type": "string" }]
+      },
+      "item": [
+        {
+          "name": "[AD] GET /devices — Admin sees ALL devices (5+)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["devices"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"20"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin sees ALL devices (not just assigned)', () => pm.expect(r.meta.pagination.total).to.be.at.least(5));",
+            "pm.test('✅ CS001, CS002, CS003 all present', () => {",
+            "  const ids = r.data.map(d => d.deviceId);",
+            "  pm.expect(ids).to.include('CS001');",
+            "  pm.expect(ids).to.include('CS002');",
+            "  pm.expect(ids).to.include('CS003');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[AD] POST /devices — Admin creates ADMINTEST device",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"ADMINTEST\",\n  \"name\": \"Admin Test Unit\",\n  \"location\": \"Admin Block X\",\n  \"description\": \"Created by Admin in Postman tests\",\n  \"alertThresholds\": {\n    \"doorOpenMinutes\": 5,\n    \"offlineMinutes\": 10\n  }\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/devices", "host": ["{{baseUrl}}"], "path": ["devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Admin created device', () => {",
+            "  pm.expect(r.data.deviceId).to.eql('ADMINTEST');",
+            "  pm.expect(r.data.status).to.eql('offline');",
+            "  pm.expect(r.data.isActive).to.be.true;",
+            "});",
+            "pm.test('✅ CreatedBy is admin', () => pm.expect(r.data.createdBy.email).to.eql(pm.environment.get('adminEmail')));",
+            "pm.environment.set('adminTestDeviceObjId', r.data._id);",
+            "pm.environment.set('adminTestDeviceId', r.data.deviceId);"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /devices/:id — Admin reads device",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/{{adminTestDeviceObjId}}", "host": ["{{baseUrl}}"], "path": ["devices", "{{adminTestDeviceObjId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Correct device returned', () => pm.expect(r.data.deviceId).to.eql('ADMINTEST'));",
+            "pm.test('✅ CreatedBy populated', () => pm.expect(r.data.createdBy).to.have.property('email'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] PUT /devices/:id — Admin updates device",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Admin Test Unit Updated\",\n  \"location\": \"Admin Block X-2\",\n  \"alertThresholds\": { \"doorOpenMinutes\": 3, \"offlineMinutes\": 15 }\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/devices/{{adminTestDeviceObjId}}", "host": ["{{baseUrl}}"], "path": ["devices", "{{adminTestDeviceObjId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Name updated', () => pm.expect(r.data.name).to.eql('Admin Test Unit Updated'));",
+            "pm.test('✅ Threshold updated', () => pm.expect(r.data.alertThresholds.doorOpenMinutes).to.eql(3));"
+          ]}}]
+        },
+        {
+          "name": "[AD] POST /devices/:id/vegetable — Admin assigns Tomato",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"vegetableId\": \"{{tomatoVegetableId}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/devices/{{adminTestDeviceObjId}}/vegetable", "host": ["{{baseUrl}}"], "path": ["devices", "{{adminTestDeviceObjId}}", "vegetable"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Tomato assigned by admin', () => pm.expect(r.data.assignedVegetable.name).to.eql('Tomato'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] DELETE /devices/:id/vegetable — Admin removes vegetable",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/{{adminTestDeviceObjId}}/vegetable", "host": ["{{baseUrl}}"], "path": ["devices", "{{adminTestDeviceObjId}}", "vegetable"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Vegetable removed by admin', () => pm.expect(pm.response.json().data.assignedVegetable).to.be.null);"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /vegetables — Admin lists all vegetables",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/vegetables?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["vegetables"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"20"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin can list vegetables', () => pm.expect(pm.response.json().data).to.be.an('array').with.length.at.least(6));"
+          ]}}]
+        },
+        {
+          "name": "[AD] POST /vegetables — Admin creates vegetable",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Admin Broccoli\",\n  \"description\": \"Created by admin in Postman tests\",\n  \"temperature\": { \"min\": 0, \"max\": 5 },\n  \"humidity\": { \"min\": 85, \"max\": 95 },\n  \"storageDurationDays\": 14\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/vegetables", "host": ["{{baseUrl}}"], "path": ["vegetables"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Vegetable created by admin', () => {",
+            "  pm.expect(r.data.name).to.eql('Admin Broccoli');",
+            "  pm.expect(r.data.temperature.min).to.eql(0);",
+            "  pm.expect(r.data.temperature.max).to.eql(5);",
+            "});",
+            "pm.environment.set('adminTestVegId', r.data._id);"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /vegetables/:id — Admin reads vegetable",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/vegetables/{{adminTestVegId}}", "host": ["{{baseUrl}}"], "path": ["vegetables", "{{adminTestVegId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Correct vegetable', () => pm.expect(pm.response.json().data.name).to.eql('Admin Broccoli'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] PUT /vegetables/:id — Admin updates vegetable",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"storageDurationDays\": 21,\n  \"description\": \"Updated by admin\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/vegetables/{{adminTestVegId}}", "host": ["{{baseUrl}}"], "path": ["vegetables", "{{adminTestVegId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ storageDurationDays updated', () => pm.expect(pm.response.json().data.storageDurationDays).to.eql(21));"
+          ]}}]
+        },
+        {
+          "name": "[AD] DELETE /vegetables/:id — Admin deletes vegetable (cleanup)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/vegetables/{{adminTestVegId}}", "host": ["{{baseUrl}}"], "path": ["vegetables", "{{adminTestVegId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Vegetable deleted by admin', () => pm.expect(pm.response.json().success).to.be.true);"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /users — Admin lists all users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["users"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"20"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin can list all users', () => pm.expect(r.meta.pagination.total).to.be.at.least(4));",
+            "pm.test('✅ Password not exposed', () => r.data.forEach(u => pm.expect(u).not.to.have.property('password')));",
+            "pm.test('✅ Role populated', () => pm.expect(r.data[0].role).to.have.property('name'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] POST /users — Admin creates viewer user",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Admin Created Viewer\",\n  \"email\": \"admintest_viewer@coldstorage.com\",\n  \"password\": \"Viewer@1234\",\n  \"role\": \"viewer\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users", "host": ["{{baseUrl}}"], "path": ["users"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Viewer created by admin', () => {",
+            "  pm.expect(r.data.email).to.eql('admintest_viewer@coldstorage.com');",
+            "  pm.expect(r.data.role.name).to.eql('viewer');",
+            "  pm.expect(r.data.isActive).to.be.true;",
+            "});",
+            "pm.test('✅ Password not in response', () => pm.expect(r.data).not.to.have.property('password'));",
+            "pm.environment.set('adminTestUserId', r.data._id);"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /users/:id — Admin reads created user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users/{{adminTestUserId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{adminTestUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Correct user', () => pm.expect(r.data._id).to.eql(pm.environment.get('adminTestUserId')));",
+            "pm.test('✅ AssignedDevices array', () => pm.expect(r.data.assignedDevices).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] PUT /users/:id — Admin updates user",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Admin Updated Viewer\",\n  \"phone\": \"+91 8888888888\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users/{{adminTestUserId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{adminTestUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Name updated by admin', () => pm.expect(pm.response.json().data.name).to.eql('Admin Updated Viewer'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] POST /users/:id/devices — Admin assigns CS001 to user",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceIds\": [\"{{cs001ObjectId}}\"]\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users/{{adminTestUserId}}/devices", "host": ["{{baseUrl}}"], "path": ["users", "{{adminTestUserId}}", "devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Device assigned by admin', () => {",
+            "  pm.expect(r.data.assignedDevices).to.be.an('array');",
+            "  pm.expect(r.data.assignedDevices.length).to.be.at.least(1);",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[AD] DELETE /users/:id/devices — Admin removes device from user",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceIds\": [\"{{cs001ObjectId}}\"]\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/users/{{adminTestUserId}}/devices", "host": ["{{baseUrl}}"], "path": ["users", "{{adminTestUserId}}", "devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Device removed by admin', () => pm.expect(pm.response.json().data.assignedDevices.length).to.eql(0));"
+          ]}}]
+        },
+        {
+          "name": "[AD] PATCH /users/:id/deactivate — Admin deactivates user",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users/{{adminTestUserId}}/deactivate", "host": ["{{baseUrl}}"], "path": ["users", "{{adminTestUserId}}", "deactivate"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ isActive is false', () => pm.expect(pm.response.json().data.isActive).to.be.false);"
+          ]}}]
+        },
+        {
+          "name": "[AD] PATCH /users/:id/activate — Admin activates user",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users/{{adminTestUserId}}/activate", "host": ["{{baseUrl}}"], "path": ["users", "{{adminTestUserId}}", "activate"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ isActive is true', () => pm.expect(pm.response.json().data.isActive).to.be.true);"
+          ]}}]
+        },
+        {
+          "name": "[AD] DELETE /users/:id — Admin deletes user (cleanup)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/users/{{adminTestUserId}}", "host": ["{{baseUrl}}"], "path": ["users", "{{adminTestUserId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ User deleted by admin', () => pm.expect(pm.response.json().success).to.be.true);"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /alerts — Admin sees ALL alerts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/alerts?page=1&limit=20", "host": ["{{baseUrl}}"], "path": ["alerts"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"20"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin can list all alerts', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /dashboard/summary — Admin sees full summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/summary", "host": ["{{baseUrl}}"], "path": ["dashboard", "summary"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin sees all devices (5+)', () => pm.expect(r.data.devices.total).to.be.at.least(5));",
+            "pm.test('✅ Admin sees users section', () => pm.expect(r.data).to.have.property('users'));",
+            "pm.test('✅ Admin sees alerts section', () => pm.expect(r.data.alerts).to.have.property('active'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /dashboard/device-health — Admin sees all devices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/device-health", "host": ["{{baseUrl}}"], "path": ["dashboard", "device-health"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin sees health for all devices (5+)', () => pm.expect(pm.response.json().data).to.be.an('array').with.length.at.least(5));"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /dashboard/temperature-overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/temperature-overview?hours=24", "host": ["{{baseUrl}}"], "path": ["dashboard", "temperature-overview"], "query": [{"key":"hours","value":"24"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin gets temperature overview', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /dashboard/alerts-by-device",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/alerts-by-device", "host": ["{{baseUrl}}"], "path": ["dashboard", "alerts-by-device"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin gets alerts by device', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /dashboard/my-devices — Admin (no assigned devices)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/dashboard/my-devices", "host": ["{{baseUrl}}"], "path": ["dashboard", "my-devices"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Returns array', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /sensors/CS001/latest — Admin reads any device",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sensors/CS001/latest", "host": ["{{baseUrl}}"], "path": ["sensors", "CS001", "latest"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin reads CS001 sensor data', () => pm.expect(pm.response.json().data.deviceId).to.eql('CS001'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /sensors/CS001/history — Admin reads history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sensors/CS001/history?page=1&limit=10", "host": ["{{baseUrl}}"], "path": ["sensors", "CS001", "history"], "query": [{"key":"page","value":"1"},{"key":"limit","value":"10"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin gets sensor history', () => pm.expect(pm.response.json().data).to.be.an('array'));"
+          ]}}]
+        },
+        {
+          "name": "[AD] GET /sensors/CS001/stats — Admin reads stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/sensors/CS001/stats?hours=24", "host": ["{{baseUrl}}"], "path": ["sensors", "CS001", "stats"], "query": [{"key":"hours","value":"24"}] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin gets sensor stats', () => {",
+            "  pm.expect(r.data).to.have.property('avgTemp');",
+            "  pm.expect(r.data).to.have.property('count');",
+            "});"
+          ]}}]
+        },
+        {
+          "name": "[AD] POST /sensors — Admin ingests sensor reading",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"deviceId\": \"CS001\",\n  \"temperature\": 4.5,\n  \"humidity\": 90,\n  \"doorStatus\": \"closed\",\n  \"timestamp\": \"{{$isoTimestamp}}\"\n}", "options": { "raw": { "language": "json" } } },
+            "url": { "raw": "{{baseUrl}}/sensors", "host": ["{{baseUrl}}"], "path": ["sensors"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Admin can ingest sensor data', () => pm.expect(r.data.reading.temperature).to.eql(4.5));"
+          ]}}]
+        },
+        {
+          "name": "[AD] DELETE /devices/:id — Admin deletes test device (cleanup)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/devices/{{adminTestDeviceObjId}}", "host": ["{{baseUrl}}"], "path": ["devices", "{{adminTestDeviceObjId}}"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Admin deleted device', () => pm.expect(pm.response.json().success).to.be.true);"
           ]}}]
         }
       ]

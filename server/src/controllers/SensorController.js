@@ -12,6 +12,14 @@ class SensorController {
     });
   });
 
+  ingestBatch = asyncHandler(async (req, res) => {
+    const result = await sensorService.ingestBatch(req.body);
+    ApiResponse.created(res, `${result.count} readings recorded`, {
+      count: result.count,
+      alertsGenerated: result.alerts.length,
+    });
+  });
+
   getLatestReading = asyncHandler(async (req, res) => {
     const reading = await sensorService.getLatestReading(req.params.deviceId);
     ApiResponse.success(res, 'Latest reading retrieved', reading);

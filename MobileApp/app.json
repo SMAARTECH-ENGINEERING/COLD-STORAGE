@@ -1,0 +1,8 @@
+{
+  "expo": {
+    "name": "Cold Storage Monitor",
+    "slug": "cold-storage-monitor",
+    "version": "1.0.0",
+    "platforms": ["ios", "android", "web"]
+  }
+}

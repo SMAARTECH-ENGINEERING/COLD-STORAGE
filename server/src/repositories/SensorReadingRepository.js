@@ -31,13 +31,16 @@ class SensorReadingRepository extends BaseRepository {
       {
         $group: {
           _id: null,
-          avgTemp: { $avg: '$temperature' },
-          minTemp: { $min: '$temperature' },
-          maxTemp: { $max: '$temperature' },
+          avgTemp:     { $avg: '$temperature' },
+          minTemp:     { $min: '$temperature' },
+          maxTemp:     { $max: '$temperature' },
           avgHumidity: { $avg: '$humidity' },
           minHumidity: { $min: '$humidity' },
           maxHumidity: { $max: '$humidity' },
-          count: { $sum: 1 },
+          avgVoc:      { $avg: '$voc' },
+          maxVoc:      { $max: '$voc' },
+          compressorOnCount: { $sum: { $cond: ['$compressor', 1, 0] } },
+          readingsCount: { $sum: 1 },
         },
       },
     ];

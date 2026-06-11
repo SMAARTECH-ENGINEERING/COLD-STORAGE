@@ -15,7 +15,16 @@ class SensorService {
   }
 
   async ingestReading(payload) {
-    const { deviceId, temperature, humidity, doorStatus, timestamp } = payload;
+    const { deviceId, timestamp } = payload;
+
+    // Normalize field names — accept both ESP32 native (temp/hum/door/voc/compressor)
+    // and legacy aliases (temperature/humidity/doorStatus)
+    const temperature = payload.temperature ?? payload.temp;
+    const humidity    = payload.humidity    ?? payload.hum;
+    const doorStatus  = payload.doorStatus
+      ?? (payload.door != null ? (payload.door ? 'open' : 'closed') : undefined);
+    const voc        = payload.voc        ?? payload.voc_index        ?? 0;
+    const compressor = payload.compressor ?? payload.compressor_state ?? false;
 
     const device = await deviceRepository.findByDeviceId(deviceId);
     if (!device) throw ApiError.notFound(`Device '${deviceId}' not found`);
@@ -27,6 +36,8 @@ class SensorService {
       temperature,
       humidity,
       doorStatus,
+      voc,
+      compressor,
       timestamp: timestamp ? new Date(timestamp) : new Date(),
     });
 
@@ -36,6 +47,7 @@ class SensorService {
     const vegetable = device.assignedVegetable;
     const newAlerts = await alertService.checkAndCreateAlerts(reading, device, vegetable);
 
+    // Check door open alert
     // Check door open alert
     if (doorStatus === 'open') {
       const doorThresholdMs = (device.alertThresholds?.doorOpenMinutes || parseInt(process.env.DOOR_OPEN_ALERT_MINUTES || '5')) * 60 * 1000;
@@ -65,8 +77,30 @@ class SensorService {
       }
     }
 
-    logger.info(`Sensor reading ingested: ${deviceId} T=${temperature} H=${humidity} D=${doorStatus}`);
+    logger.info(`Sensor reading ingested: ${deviceId} T=${temperature} H=${humidity} D=${doorStatus} VOC=${voc} COMP=${compressor}`);
     return { reading, alerts: newAlerts };
+  }
+
+  async ingestBatch(payload) {
+    const { device_id, readings } = payload;
+    const results = [];
+    let lastAlerts = [];
+
+    for (const r of readings) {
+      const result = await this.ingestReading({
+        deviceId:   device_id,
+        temp:       r.temp        ?? r.temperature,
+        hum:        r.hum         ?? r.humidity,
+        door:       r.door        ?? r.door_state,
+        voc:        r.voc         ?? r.voc_index        ?? 0,
+        compressor: r.compressor  ?? r.compressor_state ?? false,
+      });
+      results.push(result.reading);
+      lastAlerts = result.alerts;
+    }
+
+    logger.info(`Batch ingested: ${device_id} — ${results.length} readings`);
+    return { count: results.length, alerts: lastAlerts };
   }
 
   async getLatestReading(deviceId) {

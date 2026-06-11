@@ -6,7 +6,7 @@ const { operatorAndAbove, requirePermission } = require('../middleware/rbac');
 const { checkDeviceAccess } = require('../middleware/deviceAccess');
 const validate = require('../middleware/validate');
 const { sensorLimiter } = require('../middleware/rateLimiter');
-const { sensorReadingSchema } = require('../validators/sensor.validator');
+const { sensorReadingSchema, batchSensorReadingSchema } = require('../validators/sensor.validator');
 
 /**
  * @swagger
@@ -33,6 +33,15 @@ router.post(
   operatorAndAbove,
   validate(sensorReadingSchema),
   sensorController.ingestReading
+);
+
+// ESP32 batch ingest — accepts firmware's native payload (snake_case, door_state boolean)
+router.post(
+  '/ingest-batch',
+  sensorLimiter,
+  operatorAndAbove,
+  validate(batchSensorReadingSchema),
+  sensorController.ingestBatch
 );
 
 // GET routes — any authenticated role can read, but operator/viewer only their assigned devices

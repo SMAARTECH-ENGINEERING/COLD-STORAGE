@@ -1,5 +1,10 @@
+const dns = require('dns');
 const mongoose = require('mongoose');
 const logger = require('./logger');
+
+// Force Node.js c-ares to use Google DNS for SRV record lookups (mongodb+srv://)
+// The local router (192.168.1.1) refuses SRV queries causing ECONNREFUSED
+dns.setServers(['8.8.8.8', '8.8.4.4']);
 
 const connectDB = async () => {
   const uri = process.env.NODE_ENV === 'production'

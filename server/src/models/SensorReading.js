@@ -1,13 +1,15 @@
 const mongoose = require('mongoose');
 
 const sensorReadingSchema = new mongoose.Schema({
-  device: { type: mongoose.Schema.Types.ObjectId, ref: 'Device', required: true },
-  deviceId: { type: String, required: true, uppercase: true, trim: true },
+  device:      { type: mongoose.Schema.Types.ObjectId, ref: 'Device', required: true },
+  deviceId:    { type: String, required: true, uppercase: true, trim: true },
   temperature: { type: Number, required: true },
-  humidity: { type: Number, required: true, min: 0, max: 100 },
-  doorStatus: { type: String, required: true, enum: ['open', 'closed'] },
-  timestamp: { type: Date, required: true, default: Date.now },
-  isAlert: { type: Boolean, default: false },
+  humidity:    { type: Number, required: true, min: 0, max: 100 },
+  doorStatus:  { type: String, required: true, enum: ['open', 'closed'] },
+  voc:         { type: Number, default: 0, min: 0 },
+  compressor:  { type: Boolean, default: false },
+  timestamp:   { type: Date, required: true, default: Date.now },
+  isAlert:     { type: Boolean, default: false },
 }, {
   timestamps: true,
   // Use capped collection behavior via TTL index for high-volume data management
