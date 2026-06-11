@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const sensorController = require('../controllers/SensorController');
 const { authenticate } = require('../middleware/auth');
-const { operatorAndAbove, requirePermission } = require('../middleware/rbac');
+const { requirePermission } = require('../middleware/rbac');
 const { checkDeviceAccess } = require('../middleware/deviceAccess');
 const validate = require('../middleware/validate');
 const { sensorReadingSchema, batchSensorReadingSchema } = require('../validators/sensor.validator');
@@ -14,36 +14,23 @@ const { sensorReadingSchema, batchSensorReadingSchema } = require('../validators
  *   description: IoT sensor data ingestion and retrieval
  */
 
-// All sensor routes require authentication
-router.use(authenticate);
-
-/**
- * @swagger
- * /sensors:
- *   post:
- *     summary: Ingest a sensor reading from an IoT device
- *     tags: [Sensor Readings]
- *     security:
- *       - BearerAuth: []
- */
+// Device ingest — no auth required, data comes directly from ESP32/IoT hardware
 router.post(
   '/',
-  operatorAndAbove,
   validate(sensorReadingSchema),
   sensorController.ingestReading
 );
 
-// ESP32 batch ingest — accepts firmware's native payload (snake_case, door_state boolean)
 router.post(
   '/ingest-batch',
-  operatorAndAbove,
   validate(batchSensorReadingSchema),
   sensorController.ingestBatch
 );
 
-// GET routes — any authenticated role can read, but operator/viewer only their assigned devices
+// GET routes — require authentication (human users only)
 router.get(
   '/:deviceId/latest',
+  authenticate,
   requirePermission('sensors', 'read'),
   checkDeviceAccess,
   sensorController.getLatestReading
@@ -51,6 +38,7 @@ router.get(
 
 router.get(
   '/:deviceId/history',
+  authenticate,
   requirePermission('sensors', 'read'),
   checkDeviceAccess,
   sensorController.getHistoricalReadings
@@ -58,6 +46,7 @@ router.get(
 
 router.get(
   '/:deviceId/stats',
+  authenticate,
   requirePermission('sensors', 'read'),
   checkDeviceAccess,
   sensorController.getStats

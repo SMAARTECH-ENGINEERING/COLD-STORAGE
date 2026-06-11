@@ -1,473 +1,478 @@
-/*
- * Cold Storage Monitor — ESP32 + SIM800L (Airtel GSM)
- *
- * Sensors : DHT22  (temperature + humidity)
- *           Reed switch (door open/closed)
- * Network : SIM800L via UART2, Airtel GPRS
- * Backend : Node.js REST API at SERVER_HOST:SERVER_PORT
- *
- * Libraries required (install via Arduino Library Manager):
- *   - DHT sensor library  by Adafruit
- *   - ArduinoJson         by Benoit Blanchon  (v6.x)
- *
- * Wiring:
- *   SIM800L TX  →  ESP32 GPIO 16 (RX2)
- *   SIM800L RX  →  ESP32 GPIO 17 (TX2)
- *   SIM800L RST →  ESP32 GPIO 5
- *   SIM800L VCC →  4.0 V (use dedicated supply; NOT 3.3 V)
- *   SIM800L GND →  GND
- *
- *   DHT22 DATA  →  ESP32 GPIO 4  (with 10 kΩ pull-up to 3.3 V)
- *   Reed switch →  ESP32 GPIO 14 (other leg to GND; uses internal pull-up)
- *                  LOW  = door OPEN  (magnet away from switch)
- *                  HIGH = door CLOSED
- */
-
 #include <Arduino.h>
-#include <DHT.h>
+#include <U8g2lib.h>
+#include <Wire.h>
+#include "Adafruit_SGP40.h"
+
+// -- GSM / HTTP ---------------------------------------------------------------
+#define TINY_GSM_MODEM_SIM7600
+#include <TinyGsmClient.h>
+#include <ArduinoHttpClient.h>
 #include <ArduinoJson.h>
+#include <SSLClient.h>
+#ifdef U8X8_HAVE_HW_SPI
+#include <SPI.h>
+#endif
 
-// ─── Pin Definitions ──────────────────────────────────────────────────────
-#define GSM_RX_PIN       16   // ESP32 RX2  ← SIM800L TX
-#define GSM_TX_PIN       17   // ESP32 TX2  → SIM800L RX
-#define GSM_RST_PIN       5   // SIM800L RST (active LOW pulse)
-#define DHT_PIN           4   // DHT22 data
-#define DOOR_PIN         14   // Reed switch  (LOW = open, HIGH = closed)
-#define COMPRESSOR_PIN   13   // Compressor feedback  (HIGH = running)
-                              // Wire to relay feedback / current sensor output
-#define DHT_TYPE     DHT22
+// ============================================================================
+// USER CONFIG — edit before flashing
+// ============================================================================
 
-// ─── VOC Sensor ──────────────────────────────────────────────────────────
-// Uncomment the library that matches your hardware:
-//   SGP40  →  #include <Adafruit_SGP40.h>   Adafruit_SGP40 sgp;
-//   SGP30  →  #include <Adafruit_SGP30.h>   Adafruit_SGP30 sgp;
-// Leave both commented-out if no VOC sensor is fitted — reads as 0.
-//
-// #include <Adafruit_SGP40.h>
-// Adafruit_SGP40 sgp;
+// Airtel GPRS
+const char APN[]      = "airtelgprs.com";
+const char APN_USER[] = "";
+const char APN_PASS[] = "";
 
-// ─── Backend Settings  (EDIT THESE) ──────────────────────────────────────
-#define SERVER_HOST  "YOUR_SERVER_IP_OR_DOMAIN"   // e.g. "192.168.1.100" or "api.yourapp.com"
-#define SERVER_PORT  5000
-#define API_BASE     "/api/v1"
+// Render free-tier URL  (no https:// prefix — TinyGSM adds that via port 443)
+const char SERVER_HOST[] = "cold-storage-2.onrender.com";
+const int  SERVER_PORT   = 443;
 
-// Device credentials — must match what is registered in the backend
-#define DEVICE_ID    "DEVICE001"
-#define LOGIN_EMAIL  "operator@coldstorage.com"
-#define LOGIN_PASS   "YourPassword"
+// Must match a deviceId registered in the backend DB
+const char DEVICE_ID[] = "CS001";
 
-// ─── Airtel GPRS Settings ─────────────────────────────────────────────────
-// Common Airtel APNs:
-//   prepaid data  →  "airtelgprs.com"
-//   postpaid/4G   →  "airtelnxt.net"   or  "airtel.in"
-#define APN          "airtelgprs.com"
+// Operator account created in backend (role: operator)
+const char IOT_EMAIL[]    = "operator@coldstorage.com";
+const char IOT_PASSWORD[] = "Operator@1234";
 
-// ─── Timing ───────────────────────────────────────────────────────────────
-#define SEND_INTERVAL_MS   30000UL    // sensor push interval (30 s)
-#define TOKEN_LIFETIME_MS  3300000UL  // re-login before 1-hour token expires (55 min)
-#define HTTP_TIMEOUT_MS    15000UL    // max wait for HTTP response
+// ============================================================================
+// PIN ASSIGNMENTS (ESP32)
+//   I2C (SDA=21, SCL=22) shared by SGP40 and OLED
+// ============================================================================
+#define PIN_GSM_TX      17    // ESP32 TXD2  →  SIM7600 RXD
+#define PIN_GSM_RX      16    // ESP32 RXD2  ←  SIM7600 TXD
+#define PIN_GSM_PWR      4    // SIM7600 PWRKEY
 
-// ─── Globals ──────────────────────────────────────────────────────────────
-DHT dht(DHT_PIN, DHT_TYPE);
-HardwareSerial gsmSerial(2);  // UART2
+#define PIN_DOOR        34    // Reed switch  INPUT_PULLUP  HIGH=open
+#define PIN_COMPRESSOR  35    // Compressor sense           HIGH=running
+#define PIN_TEMP_ADC    36    // NTC thermistor ADC (VP pin, 12-bit)
+#define PIN_LED          2    // Onboard LED
 
-char g_accessToken[600] = "";
-unsigned long g_lastSendMs  = 0;
-unsigned long g_lastLoginMs = 0;
-bool g_gprsUp = false;
+// ============================================================================
+// NTC THERMISTOR  (10 kΩ, B=3950, pull-up to 3.3 V via 10 kΩ)
+//   Remove this block and set g_temp manually if you use a digital T sensor.
+// ============================================================================
+#define NTC_NOMINAL_R   10000.0f   // Resistance at 25 °C
+#define NTC_BCOEFF      3950.0f    // Beta coefficient
+#define NTC_SERIES_R    10000.0f   // Series resistor value
+#define NTC_NOMINAL_T   298.15f    // 25 °C in Kelvin
+#define ADC_MAX         4095.0f    // ESP32 12-bit ADC
 
-// ─── Low-level AT helpers ─────────────────────────────────────────────────
+// Cold-storage typical humidity used as SGP40 compensation default.
+// Replace with actual sensor reading when a humidity sensor is wired.
+#define HUMIDITY_DEFAULT  85.0f
 
-// Flush any pending bytes from the modem
-void gsmFlush() {
-  delay(50);
-  while (gsmSerial.available()) gsmSerial.read();
-}
+// ============================================================================
+// TIMING
+// ============================================================================
+#define SENSOR_POST_MS       30000UL           // POST every 30 s
+#define TOKEN_REFRESH_MS     (13UL * 60 * 1000) // Refresh at 13 min (server expires at 15 min)
+#define GSM_WAIT_TIMEOUT_MS  60000UL
+#define HTTP_TIMEOUT_MS      90000  // Render free tier cold-start can take ~50-80 s
 
-// Send an AT command; return true if 'expected' appears in the reply within 'timeout' ms.
-bool sendAT(const char* cmd, const char* expected, uint32_t timeout = 3000) {
-  gsmFlush();
-  gsmSerial.println(cmd);
-  unsigned long t0 = millis();
-  String buf = "";
-  while (millis() - t0 < timeout) {
-    while (gsmSerial.available()) buf += (char)gsmSerial.read();
-    if (buf.indexOf(expected) != -1) return true;
-    if (buf.indexOf("ERROR") != -1)  return false;
-  }
-  return false;
-}
+// ============================================================================
+// GLOBAL STATE
+// ============================================================================
+char     g_accessToken[512]  = "";
+char     g_refreshToken[512] = "";
+uint32_t g_tokenAt           = 0;
 
-// Send an AT command and collect the full response.
-String sendATRead(const char* cmd, uint32_t timeout = 5000) {
-  gsmFlush();
-  gsmSerial.println(cmd);
-  unsigned long t0 = millis();
-  String buf = "";
-  while (millis() - t0 < timeout) {
-    while (gsmSerial.available()) buf += (char)gsmSerial.read();
-  }
-  return buf;
-}
+float    g_temp       = 0.0f;
+float    g_humidity   = HUMIDITY_DEFAULT;
+int32_t  g_vocIndex   = 0;
+bool     g_doorOpen   = false;
+bool     g_compressor = false;
+bool     g_netOK      = false;
 
-// ─── Modem Init ───────────────────────────────────────────────────────────
+uint32_t g_lastPost   = 0;
+uint32_t g_lastRender = 0;
 
-bool waitModemReady(uint32_t maxMs = 20000) {
-  unsigned long t0 = millis();
-  while (millis() - t0 < maxMs) {
-    if (sendAT("AT", "OK", 1000)) return true;
-    delay(500);
-  }
-  return false;
-}
+// ============================================================================
+// OBJECTS
+// ============================================================================
+HardwareSerial gsmSerial(2);
+TinyGsm        modem(gsmSerial);
 
-void resetModem() {
-  Serial.println(F("[GSM] Hard-reset modem"));
-  pinMode(GSM_RST_PIN, OUTPUT);
-  digitalWrite(GSM_RST_PIN, LOW);
-  delay(300);
-  digitalWrite(GSM_RST_PIN, HIGH);
-  delay(4000);  // wait for modem boot
-}
+TinyGsmClient  gsmTransport(modem);   // raw TCP over the modem
+SSLClient      gsmClient(&gsmTransport);  // TLS done on the ESP32
 
-// ─── GPRS Bearer ─────────────────────────────────────────────────────────
+HttpClient     http(gsmClient, SERVER_HOST, SERVER_PORT);
 
-bool connectGPRS() {
-  sendAT("AT+SAPBR=0,1", "OK", 4000);  // close any stale bearer
-  delay(1000);
+Adafruit_SGP40 sgp40;
 
-  sendAT("AT+SAPBR=3,1,\"CONTYPE\",\"GPRS\"", "OK");
+// SSD1306 128×64 I2C — change constructor if your panel differs
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C oled(U8G2_R0, U8X8_PIN_NONE);
 
-  char cmd[80];
-  snprintf(cmd, sizeof(cmd), "AT+SAPBR=3,1,\"APN\",\"%s\"", APN);
-  sendAT(cmd, "OK");
+// ============================================================================
+// FORWARD DECLARATIONS
+// ============================================================================
+bool   gsmConnect();
+bool   jwtLogin();
+bool   jwtRefresh();
+bool   ensureToken();
+bool   postReading();
+void   readSensors();
+float  readNTC();
+void   renderOLED();
+void   oledMsg(const char* l1, const char* l2 = "");
+void   blinkLED(uint8_t n, uint16_t ms = 150);
 
-  sendAT("AT+SAPBR=3,1,\"USER\",\"\"", "OK");
-  sendAT("AT+SAPBR=3,1,\"PWD\",\"\"",  "OK");
-
-  if (!sendAT("AT+SAPBR=1,1", "OK", 12000)) return false;
-  delay(2000);
-
-  String ip = sendATRead("AT+SAPBR=2,1", 3000);
-  Serial.print(F("[GSM] IP: ")); Serial.println(ip);
-  return (ip.indexOf("0.0.0.0") == -1);
-}
-
-// ─── GSM Network Clock → ISO 8601 ────────────────────────────────────────
-
-String getTimestamp() {
-  String raw = sendATRead("AT+CCLK?", 2000);
-  // Example:  +CCLK: "26/06/08,10:45:30+22"
-  int s = raw.indexOf('"');
-  if (s == -1) return "";
-  int e = raw.indexOf('"', s + 1);
-  if (e == -1) return "";
-  String dt = raw.substring(s + 1, e);  // "26/06/08,10:45:30+22"
-
-  int yr, mo, da, hh, mm, ss;
-  if (sscanf(dt.c_str(), "%d/%d/%d,%d:%d:%d", &yr, &mo, &da, &hh, &mm, &ss) == 6) {
-    char iso[28];
-    snprintf(iso, sizeof(iso), "20%02d-%02d-%02dT%02d:%02d:%02d.000Z",
-             yr, mo, da, hh, mm, ss);
-    return String(iso);
-  }
-  return "";
-}
-
-// ─── HTTP POST via SIM800L AT commands ───────────────────────────────────
-//
-// Returns the raw response body string, or "" on failure.
-
-String httpPost(const char* path, const char* jsonBody, const char* bearerToken = nullptr) {
-  // Full URL
-  char url[256];
-  snprintf(url, sizeof(url), "http://%s:%d%s%s", SERVER_HOST, SERVER_PORT, API_BASE, path);
-
-  // --- Initialize HTTP stack
-  if (!sendAT("AT+HTTPINIT", "OK", 4000)) {
-    Serial.println(F("[HTTP] HTTPINIT failed"));
-    return "";
-  }
-
-  sendAT("AT+HTTPPARA=\"CID\",1", "OK");
-
-  char urlCmd[280];
-  snprintf(urlCmd, sizeof(urlCmd), "AT+HTTPPARA=\"URL\",\"%s\"", url);
-  if (!sendAT(urlCmd, "OK")) {
-    sendAT("AT+HTTPTERM", "OK", 2000);
-    return "";
-  }
-
-  sendAT("AT+HTTPPARA=\"CONTENT\",\"application/json\"", "OK");
-
-  // Bearer token header (USERDATA supports custom HTTP headers in SIM800L)
-  if (bearerToken && strlen(bearerToken) > 0) {
-    char authCmd[700];
-    snprintf(authCmd, sizeof(authCmd),
-             "AT+HTTPPARA=\"USERDATA\",\"Authorization: Bearer %s\\r\\n\"", bearerToken);
-    sendAT(authCmd, "OK");
-  }
-
-  // --- Send body
-  int bodyLen = strlen(jsonBody);
-  char dataCmd[32];
-  snprintf(dataCmd, sizeof(dataCmd), "AT+HTTPDATA=%d,10000", bodyLen);
-
-  if (!sendAT(dataCmd, "DOWNLOAD", 5000)) {
-    sendAT("AT+HTTPTERM", "OK", 2000);
-    return "";
-  }
-  gsmSerial.print(jsonBody);
-  delay(bodyLen < 300 ? 800 : 1500);
-
-  // --- Trigger POST (action=1)
-  String actionResp = sendATRead("AT+HTTPACTION=1", HTTP_TIMEOUT_MS);
-  if (actionResp.indexOf("+HTTPACTION") == -1) {
-    Serial.println(F("[HTTP] No HTTPACTION response"));
-    sendAT("AT+HTTPTERM", "OK", 2000);
-    return "";
-  }
-
-  // Check HTTP status code embedded in +HTTPACTION: 1,<status>,<len>
-  // e.g.  +HTTPACTION: 1,200,125   or  +HTTPACTION: 1,401,60
-  if (actionResp.indexOf(",401,") != -1) {
-    Serial.println(F("[HTTP] 401 Unauthorized"));
-    sendAT("AT+HTTPTERM", "OK", 2000);
-    return "401";
-  }
-  if (actionResp.indexOf(",4") != -1 || actionResp.indexOf(",5") != -1) {
-    // 4xx / 5xx errors — still read body for debug
-    Serial.println(F("[HTTP] 4xx/5xx error"));
-  }
-
-  // --- Read response body
-  String body = sendATRead("AT+HTTPREAD", 6000);
-
-  sendAT("AT+HTTPTERM", "OK", 2000);
-  return body;
-}
-
-// ─── Login ────────────────────────────────────────────────────────────────
-
-bool doLogin() {
-  Serial.println(F("[AUTH] Logging in..."));
-
-  char body[256];
-  snprintf(body, sizeof(body),
-           "{\"email\":\"%s\",\"password\":\"%s\"}",
-           LOGIN_EMAIL, LOGIN_PASS);
-
-  String resp = httpPost("/auth/login", body);
-  if (resp.length() == 0) {
-    Serial.println(F("[AUTH] No response from login endpoint"));
-    return false;
-  }
-
-  // Find the JSON object in the response (skip AT echo lines)
-  int start = resp.indexOf('{');
-  if (start == -1) {
-    Serial.println(F("[AUTH] No JSON in response"));
-    return false;
-  }
-  String json = resp.substring(start);
-
-  StaticJsonDocument<1536> doc;
-  DeserializationError err = deserializeJson(doc, json);
-  if (err) {
-    Serial.print(F("[AUTH] JSON parse error: ")); Serial.println(err.c_str());
-    return false;
-  }
-
-  // Response shape:  { success: true, data: { accessToken: "...", user: {...} } }
-  const char* token = doc["data"]["accessToken"] | doc["data"]["tokens"]["accessToken"];
-  if (!token) {
-    Serial.println(F("[AUTH] accessToken not found in response"));
-    Serial.println(json.substring(0, 300));
-    return false;
-  }
-
-  strncpy(g_accessToken, token, sizeof(g_accessToken) - 1);
-  g_lastLoginMs = millis();
-  Serial.println(F("[AUTH] Login OK — token cached"));
-  return true;
-}
-
-// ─── Send Sensor Reading ─────────────────────────────────────────────────
-//
-//  Payload fields:
-//    temp       – float   (°C, from DHT22)
-//    hum        – float   (%, from DHT22)
-//    voc        – int32   (VOC index, e.g. SGP40: 1-500; 0 if sensor absent)
-//    compressor – bool    (true = compressor relay ON)
-//    door       – bool    (true = door OPEN)
-
-bool sendReading(float temp, float hum, int32_t voc, bool compressor, bool doorOpen) {
-  char body[400];
-  String ts = getTimestamp();
-
-  if (ts.length() > 0) {
-    snprintf(body, sizeof(body),
-      "{\"deviceId\":\"%s\",\"temp\":%.1f,\"hum\":%.1f,"
-      "\"voc\":%d,\"compressor\":%s,\"door\":%s,\"timestamp\":\"%s\"}",
-      DEVICE_ID, temp, hum, voc,
-      compressor ? "true" : "false",
-      doorOpen   ? "true" : "false",
-      ts.c_str());
-  } else {
-    snprintf(body, sizeof(body),
-      "{\"deviceId\":\"%s\",\"temp\":%.1f,\"hum\":%.1f,"
-      "\"voc\":%d,\"compressor\":%s,\"door\":%s}",
-      DEVICE_ID, temp, hum, voc,
-      compressor ? "true" : "false",
-      doorOpen   ? "true" : "false");
-  }
-
-  Serial.print(F("[TX] ")); Serial.println(body);
-
-  String resp = httpPost("/sensors", body, g_accessToken);
-
-  if (resp == "401") {
-    Serial.println(F("[TX] Token expired — re-login and retry"));
-    if (doLogin()) resp = httpPost("/sensors", body, g_accessToken);
-    else return false;
-  }
-
-  if (resp.length() == 0) {
-    Serial.println(F("[TX] Send failed"));
-    return false;
-  }
-
-  // Quick success check (status 201)
-  bool ok = (resp.indexOf(",201,") != -1) || (resp.indexOf("\"success\":true") != -1);
-  Serial.println(ok ? F("[TX] Sent OK") : F("[TX] Unexpected response"));
-  if (!ok) Serial.println(resp.substring(0, 300));
-  return ok;
-}
-
-// ─── setup ────────────────────────────────────────────────────────────────
-
+// ============================================================================
+// SETUP
+// ============================================================================
 void setup() {
-  Serial.begin(115200);
-  Serial.println(F("\n=== Cold Storage Monitor (ESP32 + SIM800L) ==="));
+    Serial.begin(115200);
+    delay(200);
+    Serial.println(F("\n[BOOT] Cold Storage IoT Node v1.0"));
 
-  pinMode(DOOR_PIN,       INPUT_PULLUP);
-  pinMode(COMPRESSOR_PIN, INPUT);   // or INPUT_PULLDOWN depending on your circuit
-  dht.begin();
+    pinMode(PIN_DOOR,       INPUT_PULLUP);
+    pinMode(PIN_COMPRESSOR, INPUT);
+    pinMode(PIN_LED,        OUTPUT);
+    analogReadResolution(12);   // ESP32 12-bit ADC
+    digitalWrite(PIN_LED, LOW);
 
-  // sgp.begin();  // uncomment if VOC sensor is fitted
+    Wire.begin(21, 22);
 
-  gsmSerial.begin(9600, SERIAL_8N1, GSM_RX_PIN, GSM_TX_PIN);
+    // ---- OLED ---------------------------------------------------------------
+    oled.begin();
+    oledMsg("Cold Storage IoT", "Initializing...");
 
-  resetModem();
-
-  if (!waitModemReady()) {
-    Serial.println(F("[ERROR] GSM modem not responding — check wiring/power"));
-    return;
-  }
-  Serial.println(F("[GSM] Modem ready"));
-
-  sendAT("ATE0", "OK");                  // disable echo
-  sendAT("AT+CMEE=1", "OK");             // verbose error codes
-
-  // Wait for SIM to be ready
-  for (int i = 0; i < 20; i++) {
-    if (sendAT("AT+CPIN?", "READY", 2000)) break;
-    Serial.println(F("[SIM] Waiting for SIM..."));
-    delay(1000);
-  }
-
-  // Wait for network registration
-  Serial.print(F("[GSM] Waiting for network"));
-  bool registered = false;
-  for (int i = 0; i < 60; i++) {
-    String r = sendATRead("AT+CREG?", 2000);
-    if (r.indexOf(",1") != -1 || r.indexOf(",5") != -1) {
-      registered = true;
-      break;
+    // ---- SGP40 VOC ----------------------------------------------------------
+    if (!sgp40.begin()) {
+        Serial.println(F("[ERR] SGP40 not found — check I2C wiring (SDA=21 SCL=22)"));
+        oledMsg("SGP40 ERROR", "Check I2C wiring");
+        delay(3000);
+    } else {
+        Serial.printf("[OK]  SGP40  SN=0x%04X%04X%04X\n",
+            sgp40.serialnumber[0], sgp40.serialnumber[1], sgp40.serialnumber[2]);
     }
-    Serial.print('.');
+
+    // ---- SIM7600 GSM --------------------------------------------------------
+    gsmSerial.begin(115200, SERIAL_8N1, PIN_GSM_RX, PIN_GSM_TX);
     delay(1000);
-  }
-  Serial.println();
-  if (!registered) {
-    Serial.println(F("[ERROR] Network registration failed — check SIM / signal"));
-    return;
-  }
-  Serial.println(F("[GSM] Network registered (Airtel)"));
 
-  // Print signal quality
-  Serial.println(sendATRead("AT+CSQ", 2000));
+    oledMsg("GSM Modem", "Restarting...");
+    Serial.println(F("[GSM] Modem restart"));
+    modem.restart();
+    delay(8000);   // SIM7600 cold-start needs ~8 s
 
-  // Enable network time sync
-  sendAT("AT+CLTS=1", "OK");
-  sendAT("AT&W",      "OK");
+    Serial.print(F("[GSM] Model: "));  Serial.println(modem.getModemInfo());
+    Serial.print(F("[GSM] IMEI:  "));  Serial.println(modem.getIMEI());
+    Serial.print(F("[GSM] SIM:   "));  Serial.println(modem.getSimStatus());
 
-  // Connect GPRS
-  Serial.println(F("[GPRS] Connecting..."));
-  for (int attempt = 1; attempt <= 5; attempt++) {
-    if (connectGPRS()) {
-      g_gprsUp = true;
-      Serial.println(F("[GPRS] Connected"));
-      break;
+    // ---- GPRS connect (5 attempts) ------------------------------------------
+    oledMsg("Airtel GPRS", "Connecting...");
+    for (uint8_t i = 1; i <= 5; i++) {
+        if (gsmConnect()) break;
+        Serial.printf("[GSM] Attempt %u/5 failed — wait 15 s\n", i);
+        oledMsg("GPRS failed", "Retrying...");
+        delay(15000);
+        if (i == 5) { Serial.println(F("[GSM] Giving up — reboot")); ESP.restart(); }
     }
-    Serial.printf("[GPRS] Attempt %d/5 failed\n", attempt);
-    delay(4000);
-  }
 
-  if (!g_gprsUp) {
-    Serial.println(F("[ERROR] GPRS connection failed"));
-    return;
-  }
+    // ---- JWT login (3 attempts) ---------------------------------------------
+    oledMsg("Backend", "Authenticating...");
+    for (uint8_t i = 1; i <= 3; i++) {
+        if (jwtLogin()) break;
+        Serial.printf("[AUTH] Attempt %u/3 failed — wait 30 s\n", i);
+        delay(30000);
+        if (i == 3) { Serial.println(F("[AUTH] Giving up — reboot")); ESP.restart(); }
+    }
 
-  // Login
-  for (int attempt = 1; attempt <= 3; attempt++) {
-    if (doLogin()) break;
-    Serial.printf("[AUTH] Attempt %d/3 failed, retrying in 5 s\n", attempt);
-    delay(5000);
-  }
+    readSensors();
+    renderOLED();
+    blinkLED(3);
+    Serial.println(F("[BOOT] System ready\n"));
 }
 
-// ─── loop ─────────────────────────────────────────────────────────────────
-
+// ============================================================================
+// MAIN LOOP
+// ============================================================================
 void loop() {
-  if (!g_gprsUp) {
-    // Try to recover GPRS every minute
-    delay(60000);
-    g_gprsUp = connectGPRS();
-    return;
-  }
+    uint32_t now = millis();
 
-  unsigned long now = millis();
-
-  // Proactive token refresh before expiry
-  if (strlen(g_accessToken) > 0 && (now - g_lastLoginMs) > TOKEN_LIFETIME_MS) {
-    doLogin();
-  }
-
-  if (now - g_lastSendMs >= SEND_INTERVAL_MS) {
-    g_lastSendMs = now;
-
-    float temp = dht.readTemperature();   // Celsius
-    float hum  = dht.readHumidity();      // %RH
-
-    if (isnan(temp) || isnan(hum)) {
-      Serial.println(F("[DHT] Sensor read failed — check wiring"));
-      return;
+    // ---- JWT token refresh --------------------------------------------------
+    if (strlen(g_accessToken) > 0 && (now - g_tokenAt) >= TOKEN_REFRESH_MS) {
+        Serial.println(F("[AUTH] Token refresh due"));
+        if (!jwtRefresh()) {
+            Serial.println(F("[AUTH] Refresh failed — re-login"));
+            jwtLogin();
+        }
     }
 
-    // Reed switch: LOW = door OPEN (magnet removed from switch)
-    bool doorOpen  = (digitalRead(DOOR_PIN)       == LOW);
-    bool compOn    = (digitalRead(COMPRESSOR_PIN)  == HIGH);
+    // ---- GPRS watchdog ------------------------------------------------------
+    if (!modem.isGprsConnected()) {
+        Serial.println(F("[GSM] GPRS lost — reconnecting"));
+        g_netOK = false;
+        gsmConnect();
+    }
 
-    // VOC index — replace with your sensor read call if fitted:
-    //   int32_t voc = sgp.measureVocIndex(temp, hum);
-    int32_t voc = 0;
+    // ---- Periodic sensor post -----------------------------------------------
+    if ((now - g_lastPost) >= SENSOR_POST_MS) {
+        g_lastPost = now;
+        readSensors();
+        ensureToken();
+        g_netOK = postReading();
+        blinkLED(g_netOK ? 1 : 3, g_netOK ? 150 : 80);
+    }
 
-    Serial.printf("[SENSOR] Temp=%.1f°C  Hum=%.1f%%  VOC=%d  Comp=%s  Door=%s\n",
-                  temp, hum, voc, compOn ? "ON" : "OFF", doorOpen ? "OPEN" : "CLOSED");
+    // ---- OLED refresh every 5 s ---------------------------------------------
+    if ((now - g_lastRender) >= 5000UL) {
+        g_lastRender = now;
+        renderOLED();
+    }
 
-    if (strlen(g_accessToken) == 0) doLogin();
+    delay(50);
+}
 
-    sendReading(temp, hum, voc, compOn, doorOpen);
-  }
+// ============================================================================
+// GSM / GPRS
+// ============================================================================
+bool gsmConnect() {
+    Serial.print(F("[GSM] Waiting for network..."));
+    if (!modem.waitForNetwork(GSM_WAIT_TIMEOUT_MS)) {
+        Serial.println(F(" TIMEOUT"));
+        return false;
+    }
+    Serial.printf(" OK  RSSI=%d dBm\n", modem.getSignalQuality());
+
+    Serial.printf("[GSM] APN '%s'...", APN);
+    if (!modem.gprsConnect(APN, APN_USER, APN_PASS)) {
+        Serial.println(F(" FAILED"));
+        return false;
+    }
+    Serial.print(F(" OK  IP="));
+    Serial.println(modem.localIP());
+    return true;
+}
+
+// ============================================================================
+// JWT LOGIN  →  POST /api/v1/auth/login
+// ============================================================================
+bool jwtLogin() {
+    Serial.println(F("[AUTH] POST /api/v1/auth/login"));
+
+    StaticJsonDocument<192> req;
+    req["email"]    = IOT_EMAIL;
+    req["password"] = IOT_PASSWORD;
+    char reqBody[192];
+    serializeJson(req, reqBody, sizeof(reqBody));
+
+    http.setTimeout(HTTP_TIMEOUT_MS);
+    http.beginRequest();
+    http.post("/api/v1/auth/login");
+    http.sendHeader("Content-Type", "application/json");
+    http.sendHeader("Content-Length", (int)strlen(reqBody));
+    http.beginBody();
+    http.print(reqBody);
+    http.endRequest();
+
+    int    code = http.responseStatusCode();
+    String body = http.responseBody();
+    Serial.printf("[AUTH] Login → HTTP %d\n", code);
+    if (code != 200) return false;
+
+    // Two JWTs + user object in response — 2048 bytes covers it
+    DynamicJsonDocument resp(2048);
+    if (deserializeJson(resp, body) != DeserializationError::Ok) {
+        Serial.println(F("[AUTH] JSON parse error"));
+        return false;
+    }
+    if (!resp["success"].as<bool>()) return false;
+
+    const char* at = resp["data"]["accessToken"];
+    const char* rt = resp["data"]["refreshToken"];
+    if (!at || !rt) return false;
+
+    strlcpy(g_accessToken,  at, sizeof(g_accessToken));
+    strlcpy(g_refreshToken, rt, sizeof(g_refreshToken));
+    g_tokenAt = millis();
+
+    Serial.println(F("[AUTH] Login OK — token valid 15 min"));
+    return true;
+}
+
+// ============================================================================
+// JWT REFRESH  →  POST /api/v1/auth/refresh-token
+// ============================================================================
+bool jwtRefresh() {
+    if (strlen(g_refreshToken) == 0) return false;
+    Serial.println(F("[AUTH] POST /api/v1/auth/refresh-token"));
+
+    StaticJsonDocument<512> req;
+    req["refreshToken"] = g_refreshToken;
+    char reqBody[512];
+    serializeJson(req, reqBody, sizeof(reqBody));
+
+    http.setTimeout(HTTP_TIMEOUT_MS);
+    http.beginRequest();
+    http.post("/api/v1/auth/refresh-token");
+    http.sendHeader("Content-Type", "application/json");
+    http.sendHeader("Content-Length", (int)strlen(reqBody));
+    http.beginBody();
+    http.print(reqBody);
+    http.endRequest();
+
+    int    code = http.responseStatusCode();
+    String body = http.responseBody();
+    if (code != 200) return false;
+
+    DynamicJsonDocument resp(1536);
+    if (deserializeJson(resp, body) != DeserializationError::Ok) return false;
+    if (!resp["success"].as<bool>()) return false;
+
+    const char* at = resp["data"]["accessToken"];
+    if (!at) return false;
+    strlcpy(g_accessToken, at, sizeof(g_accessToken));
+    g_tokenAt = millis();
+
+    // Server may issue a rotated refresh token
+    const char* rt = resp["data"]["refreshToken"];
+    if (rt) strlcpy(g_refreshToken, rt, sizeof(g_refreshToken));
+
+    Serial.println(F("[AUTH] Refresh OK"));
+    return true;
+}
+
+bool ensureToken() {
+    if (strlen(g_accessToken) > 0) return true;
+    return jwtLogin();
+}
+
+// ============================================================================
+// NTC THERMISTOR TEMPERATURE READ (GPIO36 / ADC)
+//   Steinhart-Hart simplified (B-parameter equation)
+//   Wiring: 3.3V → 10kΩ resistor → GPIO36 → 10kΩ NTC → GND
+// ============================================================================
+float readNTC() {
+    // Average 8 samples for noise rejection
+    uint32_t raw = 0;
+    for (uint8_t i = 0; i < 8; i++) { raw += analogRead(PIN_TEMP_ADC); delay(2); }
+    float adcVal = raw / 8.0f;
+
+    if (adcVal <= 0 || adcVal >= ADC_MAX) return g_temp;  // open/short circuit guard
+
+    float resistance = NTC_SERIES_R * (ADC_MAX / adcVal - 1.0f);
+    float steinhart  = log(resistance / NTC_NOMINAL_R) / NTC_BCOEFF;
+    steinhart       += 1.0f / NTC_NOMINAL_T;
+    return (1.0f / steinhart) - 273.15f;   // Kelvin → °C
+}
+
+// ============================================================================
+// SENSOR READING
+// ============================================================================
+void readSensors() {
+    // Temperature via NTC (no external library needed)
+    float t = readNTC();
+    if (t > -40.0f && t < 85.0f) g_temp = t;   // sanity range
+
+    // Humidity: fixed cold-storage default (wire SHT31/DHT22 here when available)
+    g_humidity = HUMIDITY_DEFAULT;
+
+    // SGP40 VOC index 0–500  (100 = clean air baseline)
+    g_vocIndex = sgp40.measureVocIndex(g_temp, g_humidity);
+
+    // Reed switch: INPUT_PULLUP — HIGH = door open (magnet away)
+    g_doorOpen   = (digitalRead(PIN_DOOR) == HIGH);
+
+    // Compressor sense line
+    g_compressor = (digitalRead(PIN_COMPRESSOR) == HIGH);
+
+    Serial.printf("[SENSOR] T=%.2f°C  H=%.0f%%  VOC=%d  Door=%s  Comp=%s\n",
+        g_temp, g_humidity, g_vocIndex,
+        g_doorOpen   ? "OPEN"   : "CLOSED",
+        g_compressor ? "ON"     : "OFF");
+}
+
+// ============================================================================
+// POST SENSOR DATA  →  POST /api/v1/sensors
+//   Field names match backend flexible ingest (camelCase accepted)
+// ============================================================================
+bool postReading() {
+    if (strlen(g_accessToken) == 0) return false;
+
+    StaticJsonDocument<256> payload;
+    payload["deviceId"]   = DEVICE_ID;
+    payload["temp"]       = g_temp;       // °C
+    payload["hum"]        = g_humidity;   // %RH
+    payload["door"]       = g_doorOpen;   // true = open
+    payload["voc"]        = g_vocIndex;   // 0–500
+    payload["compressor"] = g_compressor; // true = running
+
+    char body[256];
+    serializeJson(payload, body, sizeof(body));
+
+    // "Bearer <token>" — token up to 511 chars + 7 prefix + null
+    char authHdr[520];
+    snprintf(authHdr, sizeof(authHdr), "Bearer %s", g_accessToken);
+
+    http.setTimeout(HTTP_TIMEOUT_MS);
+    http.beginRequest();
+    http.post("/api/v1/sensors");
+    http.sendHeader("Content-Type",  "application/json");
+    http.sendHeader("Content-Length", (int)strlen(body));
+    http.sendHeader("Authorization",  authHdr);
+    http.beginBody();
+    http.print(body);
+    http.endRequest();
+
+    int code = http.responseStatusCode();
+    http.responseBody();  // flush — prevents stale data on next request
+
+    Serial.printf("[HTTP] POST /api/v1/sensors → %d\n", code);
+
+    if (code == 401) {
+        // Token expired mid-cycle — clear forces re-login on next iteration
+        memset(g_accessToken, 0, sizeof(g_accessToken));
+        return false;
+    }
+    return (code == 200 || code == 201);
+}
+
+// ============================================================================
+// OLED DISPLAY  128×64  font u8g2_font_6x10_tf → ~21 chars/row
+// ============================================================================
+void renderOLED() {
+    char r1[22], r2[22], r3[22], ft[22];
+
+    snprintf(r1, sizeof(r1), "Temp:%.1fC  Hum:%.0f%%", g_temp, g_humidity);
+    snprintf(r2, sizeof(r2), "VOC:%-5d Door:%-4s",
+             g_vocIndex, g_doorOpen ? "OPEN" : "CLSD");
+    snprintf(r3, sizeof(r3), "Comp:%-3s  Net:%-3s",
+             g_compressor ? "ON"  : "OFF",
+             g_netOK      ? "OK"  : "ERR");
+    snprintf(ft, sizeof(ft), "%-11s RSSI:%d",
+             DEVICE_ID, modem.getSignalQuality());
+
+    oled.clearBuffer();
+    oled.setFont(u8g2_font_6x10_tf);
+
+    oled.drawStr(0, 10,  "= COLD STORAGE IoT =");
+    oled.drawHLine(0, 12, 128);
+
+    oled.drawStr(0, 24, r1);
+    oled.drawStr(0, 36, r2);
+    oled.drawStr(0, 48, r3);
+
+    oled.drawHLine(0, 51, 128);
+    oled.setFont(u8g2_font_5x7_tf);
+    oled.drawStr(0, 63, ft);
+
+    oled.sendBuffer();
+}
+
+void oledMsg(const char* l1, const char* l2) {
+    oled.clearBuffer();
+    oled.setFont(u8g2_font_6x10_tf);
+    oled.drawStr(0, 16, l1);
+    if (l2 && l2[0]) oled.drawStr(0, 32, l2);
+    oled.sendBuffer();
+}
+
+// ============================================================================
+// UTILITY
+// ============================================================================
+void blinkLED(uint8_t n, uint16_t ms) {
+    for (uint8_t i = 0; i < n; i++) {
+        digitalWrite(PIN_LED, HIGH); delay(ms);
+        digitalWrite(PIN_LED, LOW);  delay(ms);
+    }
 }
