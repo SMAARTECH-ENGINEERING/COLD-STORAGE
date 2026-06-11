@@ -5,7 +5,6 @@ const { authenticate } = require('../middleware/auth');
 const { operatorAndAbove, requirePermission } = require('../middleware/rbac');
 const { checkDeviceAccess } = require('../middleware/deviceAccess');
 const validate = require('../middleware/validate');
-const { sensorLimiter } = require('../middleware/rateLimiter');
 const { sensorReadingSchema, batchSensorReadingSchema } = require('../validators/sensor.validator');
 
 /**
@@ -29,7 +28,6 @@ router.use(authenticate);
  */
 router.post(
   '/',
-  sensorLimiter,
   operatorAndAbove,
   validate(sensorReadingSchema),
   sensorController.ingestReading
@@ -38,7 +36,6 @@ router.post(
 // ESP32 batch ingest — accepts firmware's native payload (snake_case, door_state boolean)
 router.post(
   '/ingest-batch',
-  sensorLimiter,
   operatorAndAbove,
   validate(batchSensorReadingSchema),
   sensorController.ingestBatch

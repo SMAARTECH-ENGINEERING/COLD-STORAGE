@@ -9,7 +9,6 @@ const swaggerUi = require('swagger-ui-express');
 const morganMiddleware = require('./config/morgan');
 
 const { errorHandler, notFound } = require('./middleware/errorHandler');
-const { apiLimiter } = require('./middleware/rateLimiter');
 const routes = require('./routes');
 const swaggerSpec = require('../docs/swagger');
 
@@ -52,9 +51,6 @@ app.use(compression());
 
 // ─── Logging ─────────────────────────────────────────────────────────────────
 app.use(morganMiddleware);
-
-// ─── Rate Limiting ───────────────────────────────────────────────────────────
-app.use('/api', apiLimiter);
 
 // ─── API Version Header ──────────────────────────────────────────────────────
 app.use((req, res, next) => {

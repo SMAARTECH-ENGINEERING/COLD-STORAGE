@@ -3,7 +3,6 @@ const router = express.Router();
 const authController = require('../controllers/AuthController');
 const { authenticate } = require('../middleware/auth');
 const validate = require('../middleware/validate');
-const { authLimiter } = require('../middleware/rateLimiter');
 const { loginSchema, refreshTokenSchema } = require('../validators/auth.validator');
 
 /**
@@ -42,7 +41,7 @@ const { loginSchema, refreshTokenSchema } = require('../validators/auth.validato
  *       429:
  *         description: Too many login attempts
  */
-router.post('/login', authLimiter, validate(loginSchema), authController.login);
+router.post('/login', validate(loginSchema), authController.login);
 
 /**
  * @swagger
