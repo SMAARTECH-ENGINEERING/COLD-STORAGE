@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { MdOutlineStorefront } from 'react-icons/md';
 import { FiEye, FiEyeOff, FiMail, FiLock } from 'react-icons/fi';
 import { useAuth } from '../../context/AuthContext';
+import logo from '../../Assets/Logos/logo.png';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -41,7 +41,7 @@ const Login = () => {
       {/* Left panel */}
       <div className="hidden md:flex flex-col justify-center items-center bg-[#2E3A8C] text-white px-12">
         <div className="mb-8">
-          <MdOutlineStorefront size={72} className="opacity-90" />
+          <img src={logo} alt="Smaafrost Logo" className="h-24 w-auto object-contain drop-shadow-lg" />
         </div>
         <h1 className="text-4xl font-bold mb-4 text-center">Cold Storage Monitor</h1>
         <p className="text-lg text-blue-200 text-center max-w-sm">
@@ -65,7 +65,7 @@ const Login = () => {
       <div className="flex justify-center items-center p-8 bg-[#f2f6fc]">
         <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
           <div className="flex items-center gap-2 mb-2 md:hidden">
-            <MdOutlineStorefront size={28} className="text-[#2E3A8C]" />
+            <img src={logo} alt="Smaafrost Logo" className="h-8 w-auto object-contain" />
             <span className="text-[#2E3A8C] font-bold text-xl">Cold Storage Monitor</span>
           </div>
 

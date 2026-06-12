@@ -17,7 +17,8 @@ const Vegetables = lazy(() => import('./Screens/Admin/Vegetables'));
 const Users      = lazy(() => import('./Screens/Admin/Users'));
 const Profile      = lazy(() => import('./Screens/Admin/Profile'));
 const Settings     = lazy(() => import('./Screens/Admin/Settings'));
-const StorageUnits = lazy(() => import('./Screens/Admin/StorageUnits'));
+const StorageUnits       = lazy(() => import('./Screens/Admin/StorageUnits'));
+const StorageUnitDetail  = lazy(() => import('./Screens/Admin/StorageUnitDetail'));
 const Reports      = lazy(() => import('./Screens/Admin/Reports'));
 const DeviceDetail = lazy(() => import('./Screens/Admin/DeviceDetail'));
 const NotFound     = lazy(() => import('./Screens/404'));
@@ -35,7 +36,8 @@ const userRoutes = [
   { path: '/admin/devices',    component: <Devices /> },
   { path: '/admin/alerts',     component: <Alerts /> },
   { path: '/admin/vegetables',     component: <Vegetables /> },
-  { path: '/admin/storage-units',  component: <StorageUnits /> },
+  { path: '/admin/storage-units',     component: <StorageUnits /> },
+  { path: '/admin/storage-units/:id', component: <StorageUnitDetail /> },
   { path: '/admin/users',          component: <Users /> },
   { path: '/admin/profile',    component: <Profile /> },
   { path: '/admin/settings',      component: <Settings /> },

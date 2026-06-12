@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import {
   FiPlus, FiSearch, FiEdit2, FiTrash2, FiRefreshCw,
-  FiBox, FiCpu, FiX, FiZap,
+  FiBox, FiCpu, FiX, FiZap, FiChevronRight,
 } from 'react-icons/fi';
 import { MdOutlineEco } from 'react-icons/md';
 import Dialog from '@mui/material/Dialog';
@@ -62,6 +63,7 @@ const UsageBar = ({ pct }) => {
 // ─── Main page ─────────────────────────────────────────────────────────────────
 const StorageUnits = () => {
   const { isAdmin, hasPermission } = useAuth();
+  const navigate = useNavigate();
 
   const [units, setUnits]           = useState([]);
   const [loading, setLoading]       = useState(true);
@@ -355,7 +357,11 @@ const StorageUnits = () => {
             const pctColor = pct >= 90 ? 'text-red-600' : pct >= 70 ? 'text-yellow-600' : 'text-green-600';
 
             return (
-              <div key={u._id} className="bg-white rounded-xl shadow-sm p-5 hover:shadow-md transition-shadow group flex flex-col gap-4">
+              <div
+                key={u._id}
+                onClick={() => navigate(`/admin/storage-units/${u._id}`)}
+                className="bg-white rounded-xl shadow-sm p-5 hover:shadow-md hover:ring-2 hover:ring-[#2E3A8C]/20 transition-all cursor-pointer group flex flex-col gap-4"
+              >
 
                 {/* Top row */}
                 <div className="flex items-start justify-between">
@@ -364,20 +370,23 @@ const StorageUnits = () => {
                       <FiBox size={20} className="text-[#2E3A8C]" />
                     </div>
                     <div>
-                      <div className="font-semibold text-[#2E3A8C] text-sm leading-tight">{u.name}</div>
+                      <div className="font-semibold text-[#2E3A8C] text-sm leading-tight group-hover:underline">{u.name}</div>
                       <div className="text-xs text-gray-400 font-mono mt-0.5">{u.unitId}</div>
                     </div>
                   </div>
-                  {isAdmin && (
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => openEdit(u)} className="p-1 text-gray-400 hover:text-[#2E3A8C] rounded" title="Edit">
-                        <FiEdit2 size={13} />
-                      </button>
-                      <button onClick={() => setDeleteTarget(u)} className="p-1 text-gray-400 hover:text-red-500 rounded" title="Delete">
-                        <FiTrash2 size={13} />
-                      </button>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-1">
+                    {isAdmin && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={(e) => { e.stopPropagation(); openEdit(u); }} className="p-1 text-gray-400 hover:text-[#2E3A8C] rounded" title="Edit">
+                          <FiEdit2 size={13} />
+                        </button>
+                        <button onClick={(e) => { e.stopPropagation(); setDeleteTarget(u); }} className="p-1 text-gray-400 hover:text-red-500 rounded" title="Delete">
+                          <FiTrash2 size={13} />
+                        </button>
+                      </div>
+                    )}
+                    <FiChevronRight size={15} className="text-gray-300 group-hover:text-[#2E3A8C] transition-colors flex-shrink-0" />
+                  </div>
                 </div>
 
                 {/* Capacity bar */}
@@ -402,7 +411,7 @@ const StorageUnits = () => {
 
                 {/* Vegetable badge */}
                 <button
-                  onClick={() => isAdmin && openVegModal(u)}
+                  onClick={(e) => { e.stopPropagation(); isAdmin && openVegModal(u); }}
                   className={`self-start text-xs px-2.5 py-1 rounded-full border transition-colors flex items-center gap-1.5 ${
                     u.assignedVegetable
                       ? 'border-green-200 text-green-700 bg-green-50 hover:bg-green-100'
@@ -430,21 +439,21 @@ const StorageUnits = () => {
                 {/* Action row */}
                 <div className="pt-1 border-t border-gray-100 flex flex-wrap gap-2">
                   <button
-                    onClick={() => openStockModal(u)}
+                    onClick={(e) => { e.stopPropagation(); openStockModal(u); }}
                     className="text-xs px-3 py-1.5 bg-[#2E3A8C] text-white rounded-lg hover:bg-[#1e2d6e] transition-colors flex items-center gap-1"
                   >
                     <FiZap size={11} /> Update Stock
                   </button>
                   {isAdmin && (
                     <button
-                      onClick={() => openDevModal(u)}
+                      onClick={(e) => { e.stopPropagation(); openDevModal(u); }}
                       className="text-xs px-3 py-1.5 border border-gray-200 text-[#49608c] rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-1"
                     >
                       <FiCpu size={11} /> Manage Devices
                     </button>
                   )}
                   <button
-                    onClick={() => openCalcModal(u)}
+                    onClick={(e) => { e.stopPropagation(); openCalcModal(u); }}
                     className="text-xs px-3 py-1.5 border border-blue-200 text-[#2E3A8C] rounded-lg hover:bg-blue-50 transition-colors flex items-center gap-1"
                   >
                     <FiBox size={11} /> Capacity Calc

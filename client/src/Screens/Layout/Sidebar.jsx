@@ -1,9 +1,9 @@
 import React from 'react';
 import './Sidebar.css';
 import SidebarsContent from './SidebarsContent';
-import { MdOutlineStorefront } from 'react-icons/md';
 import { AiOutlineClose } from 'react-icons/ai';
 import { useAuth } from '../../context/AuthContext';
+import logo from '../../Assets/Logos/logo.png';
 
 const SIDEBAR_STYLE = { zIndex: 50 };
 
@@ -21,9 +21,7 @@ const Sidebar = React.memo(({ isOpen, toggleSidebar }) => {
       <div className="px-5 py-5 border-b border-gray-100">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 bg-[#2E3A8C] rounded-lg flex items-center justify-center">
-              <MdOutlineStorefront size={22} color="white" />
-            </div>
+            <img src={logo} alt="Smaafrost" className="h-9 w-auto object-contain" />
             <div>
               <div className="text-sm font-bold text-[#2E3A8C] leading-tight">Smaafrost</div>
               <div className="text-[10px] text-gray-400 leading-tight">Monitor</div>

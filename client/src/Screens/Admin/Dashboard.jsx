@@ -28,17 +28,20 @@ const alertTypeLabel = {
 };
 
 /* ─── memoized sub-components ────────────────────────────────────────────── */
-const StatCard = React.memo(({ icon, label, value, sub, color }) => (
-  <div className="bg-white rounded-xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+const StatCard = React.memo(({ icon, label, value, sub, color, onClick }) => (
+  <div
+    onClick={onClick}
+    className={`bg-white rounded-xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-all ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-[#2E3A8C]/20 active:scale-[0.98]' : ''}`}
+  >
     <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
       {icon}
     </div>
-    <div>
+    <div className="min-w-0">
       <div className="text-2xl font-bold text-[#2E3A8C]">
         {value !== undefined && value !== null ? value : <span className="text-gray-300 text-xl">—</span>}
       </div>
-      <div className="text-sm text-[#49608c]">{label}</div>
-      {sub && <div className="text-xs text-gray-400 mt-0.5">{sub}</div>}
+      <div className="text-sm text-[#49608c] truncate">{label}</div>
+      {sub && <div className="text-xs text-gray-400 mt-0.5 truncate">{sub}</div>}
     </div>
   </div>
 ));
@@ -141,6 +144,7 @@ const Dashboard = () => {
       value: summary?.devices?.total,
       sub:   `${summary?.devices?.online ?? 0} online`,
       color: 'bg-blue-50',
+      onClick: () => navigate('/admin/devices'),
     },
     {
       icon:  <MdOutlineSensors size={22} className="text-green-600" />,
@@ -148,6 +152,7 @@ const Dashboard = () => {
       value: summary?.devices?.online,
       sub:   `${summary?.devices?.offline ?? 0} offline`,
       color: 'bg-green-50',
+      onClick: () => navigate('/admin/devices'),
     },
     {
       icon:  <FiBell size={22} className="text-red-500" />,
@@ -155,6 +160,7 @@ const Dashboard = () => {
       value: summary?.alerts?.active,
       sub:   'requires attention',
       color: 'bg-red-50',
+      onClick: () => navigate('/admin/alerts'),
     },
     ...(isAdmin
       ? [{
@@ -163,9 +169,10 @@ const Dashboard = () => {
           value: summary?.users?.total,
           sub:   `${summary?.users?.active ?? 0} active`,
           color: 'bg-purple-50',
+          onClick: () => navigate('/admin/users'),
         }]
       : []),
-  ], [summary, isAdmin]);
+  ], [summary, isAdmin, navigate]);
 
   return (
     <div className="space-y-6">
@@ -192,7 +199,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {loading
           ? Array(4).fill(0).map((_, i) => <StatCardSkeleton key={i} />)
-          : stats.map((s) => <StatCard key={s.label} {...s} />)}
+          : stats.map((s) => <StatCard key={s.label} {...s} onClick={s.onClick} />)}
       </div>
 
       {/* Main content */}
