@@ -18,6 +18,10 @@ const PERMISSIONS = {
     resource: 'vegetables',
     actions: { CREATE: 'create', READ: 'read', UPDATE: 'update', DELETE: 'delete' },
   },
+  STORAGE_UNITS: {
+    resource: 'storage_units',
+    actions: { CREATE: 'create', READ: 'read', UPDATE: 'update', DELETE: 'delete' },
+  },
   SENSORS: {
     resource: 'sensors',
     actions: { CREATE: 'create', READ: 'read' },
@@ -42,6 +46,7 @@ const ROLE_PERMISSIONS = {
     { resource: 'users', actions: ['create', 'read', 'update', 'delete'] },
     { resource: 'devices', actions: ['create', 'read', 'update', 'delete'] },
     { resource: 'vegetables', actions: ['create', 'read', 'update', 'delete'] },
+    { resource: 'storage_units', actions: ['create', 'read', 'update', 'delete'] },
     { resource: 'sensors', actions: ['create', 'read'] },
     { resource: 'alerts', actions: ['read', 'acknowledge', 'delete'] },
     { resource: 'dashboard', actions: ['read'] },
@@ -51,6 +56,7 @@ const ROLE_PERMISSIONS = {
     { resource: 'users', actions: ['create', 'read', 'update', 'delete'] },
     { resource: 'devices', actions: ['create', 'read', 'update', 'delete'] },
     { resource: 'vegetables', actions: ['create', 'read', 'update', 'delete'] },
+    { resource: 'storage_units', actions: ['create', 'read', 'update', 'delete'] },
     { resource: 'sensors', actions: ['create', 'read'] },
     { resource: 'alerts', actions: ['read', 'acknowledge'] },
     { resource: 'dashboard', actions: ['read'] },
@@ -60,6 +66,7 @@ const ROLE_PERMISSIONS = {
     { resource: 'users', actions: ['read'] },
     { resource: 'devices', actions: ['read'] },
     { resource: 'vegetables', actions: ['read'] },
+    { resource: 'storage_units', actions: ['read'] },
     { resource: 'sensors', actions: ['create', 'read'] },
     { resource: 'alerts', actions: ['read', 'acknowledge'] },
     { resource: 'dashboard', actions: ['read'] },
@@ -67,6 +74,7 @@ const ROLE_PERMISSIONS = {
   [ROLES.VIEWER]: [
     { resource: 'devices', actions: ['read'] },
     { resource: 'vegetables', actions: ['read'] },
+    { resource: 'storage_units', actions: ['read'] },
     { resource: 'sensors', actions: ['read'] },
     { resource: 'alerts', actions: ['read'] },
     { resource: 'dashboard', actions: ['read'] },
@@ -91,4 +99,24 @@ const PAGINATION = {
 
 const SORT_ORDERS = { ASC: 'asc', DESC: 'desc' };
 
-module.exports = { ROLES, PERMISSIONS, ROLE_PERMISSIONS, ALERT_SEVERITY_MAP, PAGINATION, SORT_ORDERS };
+// Approximate kg that can be packed per cubic metre for each vegetable type.
+// Used by the storage capacity calculator when the unit has volume-based dimensions.
+const VEGETABLE_PACKING_DENSITIES = {
+  potato:  650,
+  onion:   550,
+  carrot:  500,
+  tomato:  450,
+  cabbage: 400,
+  apple:   430,
+  default: 500,
+};
+
+module.exports = {
+  ROLES,
+  PERMISSIONS,
+  ROLE_PERMISSIONS,
+  ALERT_SEVERITY_MAP,
+  PAGINATION,
+  SORT_ORDERS,
+  VEGETABLE_PACKING_DENSITIES,
+};

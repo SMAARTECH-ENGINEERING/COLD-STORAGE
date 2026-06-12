@@ -4,6 +4,7 @@ import Dashboard from '../Screens/Admin/Dashboard';
 import Users from '../Screens/Admin/Users';
 import Devices from '../Screens/Admin/Devices';
 import Vegetables from '../Screens/Admin/Vegetables';
+import StorageUnits from '../Screens/Admin/StorageUnits';
 import Alerts from '../Screens/Admin/Alerts';
 import Profile from '../Screens/Admin/Profile';
 import Settings from '../Screens/Admin/Settings';
@@ -15,6 +16,7 @@ const userRoutes = [
   { path: '/admin/devices', component: <Devices /> },
   { path: '/admin/alerts', component: <Alerts /> },
   { path: '/admin/vegetables', component: <Vegetables /> },
+  { path: '/admin/storage-units', component: <StorageUnits /> },
   { path: '/admin/users', component: <Users /> },
   { path: '/admin/profile', component: <Profile /> },
   { path: '/admin/settings', component: <Settings /> },

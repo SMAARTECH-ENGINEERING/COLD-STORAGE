@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BiSolidDashboard } from 'react-icons/bi';
-import { FiUsers, FiCpu, FiBell, FiUser, FiSettings, FiBarChart2 } from 'react-icons/fi';
+import { FiUsers, FiCpu, FiBell, FiUser, FiSettings, FiBarChart2, FiBox } from 'react-icons/fi';
 import { MdOutlineEco } from 'react-icons/md';
 import { useAuth } from '../../context/AuthContext';
 
@@ -39,6 +39,12 @@ const SidebarsContent = () => {
       label: 'Fruits & Vegs',
       icon: <MdOutlineEco size={20} />,
       show: hasPermission('vegetables', 'read'),
+    },
+    {
+      path: '/admin/storage-units',
+      label: 'Storage Units',
+      icon: <FiBox size={20} />,
+      show: hasPermission('storage_units', 'read'),
     },
     {
       path: '/admin/users',

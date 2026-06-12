@@ -2209,6 +2209,652 @@
           ]}}]
         }
       ]
+    },
+
+    {
+      "name": "10. Storage Units",
+      "description": "Cold storage unit management — capacity tracking, device assignment, vegetable assignment, and stock management.\n\nCapacity logic:\n- 5-ton unit → maxCapacityKg = 5000 kg\n- 10-ton unit → maxCapacityKg = 10000 kg\n- Packing densities: potato=650, onion=550, carrot=500, tomato=450, cabbage=400 kg/m³\n\nRun folder 3 (Devices) first so cs001ObjectId and cs002ObjectId are available.",
+      "item": [
+
+        {
+          "name": "[SA] GET /storage-units — All (empty list initially)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units"],
+              "query": [{"key":"page","value":"1"},{"key":"limit","value":"10"}]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Paginated response', () => {",
+            "  pm.expect(r.meta.pagination).to.have.property('total');",
+            "  pm.expect(r.data).to.be.an('array');",
+            "});",
+            "pm.test('✅ success true', () => pm.expect(r.success).to.be.true);"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] POST /storage-units — Create 5-Ton Unit (Potato)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unitId\": \"CS-UNIT-5T\",\n  \"name\": \"Cold Chamber A — 5 Ton\",\n  \"description\": \"5-ton potato storage chamber, Block A\",\n  \"capacityTons\": 5,\n  \"location\": \"Warehouse Block A\",\n  \"currentStockKg\": 0\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/storage-units", "host": ["{{baseUrl}}"], "path": ["storage-units"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ Unit created', () => {",
+            "  pm.expect(r.data.unitId).to.eql('CS-UNIT-5T');",
+            "  pm.expect(r.data.capacityTons).to.eql(5);",
+            "  pm.expect(r.data.currentStockKg).to.eql(0);",
+            "  pm.expect(r.data.isActive).to.be.true;",
+            "});",
+            "pm.test('✅ Virtuals: maxCapacityKg = 5000', () => pm.expect(r.data.maxCapacityKg).to.eql(5000));",
+            "pm.test('✅ Virtuals: availableCapacityKg = 5000', () => pm.expect(r.data.availableCapacityKg).to.eql(5000));",
+            "pm.test('✅ Virtuals: usagePercentage = 0', () => pm.expect(r.data.usagePercentage).to.eql(0));",
+            "pm.environment.set('unit5tId', r.data._id);",
+            "pm.environment.set('unit5tUnitId', r.data.unitId);",
+            "console.log('5-ton unit created, _id:', r.data._id);"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] POST /storage-units — Create 10-Ton Unit (Onion)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unitId\": \"CS-UNIT-10T\",\n  \"name\": \"Cold Chamber B — 10 Ton\",\n  \"description\": \"10-ton onion storage chamber, Block B\",\n  \"capacityTons\": 10,\n  \"location\": \"Warehouse Block B\",\n  \"currentStockKg\": 0\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/storage-units", "host": ["{{baseUrl}}"], "path": ["storage-units"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 201', () => pm.response.to.have.status(201));",
+            "pm.test('✅ 10-ton unit created', () => {",
+            "  pm.expect(r.data.unitId).to.eql('CS-UNIT-10T');",
+            "  pm.expect(r.data.capacityTons).to.eql(10);",
+            "});",
+            "pm.test('✅ maxCapacityKg = 10000', () => pm.expect(r.data.maxCapacityKg).to.eql(10000));",
+            "pm.test('✅ availableCapacityKg = 10000', () => pm.expect(r.data.availableCapacityKg).to.eql(10000));",
+            "pm.environment.set('unit10tId', r.data._id);",
+            "pm.environment.set('unit10tUnitId', r.data.unitId);",
+            "console.log('10-ton unit created, _id:', r.data._id);"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] GET /storage-units — List (now 2 units)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units?page=1&limit=10&sortBy=capacityTons&sortOrder=asc",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units"],
+              "query": [
+                {"key":"page","value":"1"},
+                {"key":"limit","value":"10"},
+                {"key":"sortBy","value":"capacityTons"},
+                {"key":"sortOrder","value":"asc"}
+              ]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ 2 units returned', () => pm.expect(r.meta.pagination.total).to.be.at.least(2));",
+            "pm.test('✅ Has required fields', () => {",
+            "  const u = r.data[0];",
+            "  pm.expect(u).to.have.property('unitId');",
+            "  pm.expect(u).to.have.property('capacityTons');",
+            "  pm.expect(u).to.have.property('currentStockKg');",
+            "  pm.expect(u).to.have.property('maxCapacityKg');",
+            "  pm.expect(u).to.have.property('availableCapacityKg');",
+            "  pm.expect(u).to.have.property('usagePercentage');",
+            "});"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] GET /storage-units/:id — 5-Ton Unit Detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Correct unit returned', () => pm.expect(r.data.unitId).to.eql('CS-UNIT-5T'));",
+            "pm.test('✅ assignedDevices is array', () => pm.expect(r.data.assignedDevices).to.be.an('array'));",
+            "pm.test('✅ createdBy populated', () => pm.expect(r.data.createdBy).to.have.property('email'));"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] PUT /storage-units/:id — Update 5-Ton Unit",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Cold Chamber A — 5 Ton (Updated)\",\n  \"description\": \"Updated description for Block A chamber\",\n  \"location\": \"Warehouse Block A — Section 1\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Name updated', () => pm.expect(r.data.name).to.include('Updated'));",
+            "pm.test('✅ capacityTons unchanged', () => pm.expect(r.data.capacityTons).to.eql(5));"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] POST /storage-units/:id/vegetable — Assign Potato to 5T Unit",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vegetableId\": \"{{potatoVegetableId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}/vegetable",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}", "vegetable"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Potato assigned to 5T unit', () => {",
+            "  pm.expect(r.data.assignedVegetable).to.not.be.null;",
+            "});"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] POST /storage-units/:id/vegetable — Assign Onion to 10T Unit",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"vegetableId\": \"{{potatoVegetableId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit10tId}}/vegetable",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit10tId}}", "vegetable"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200 — Vegetable assigned to 10T unit', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] POST /storage-units/:id/devices — Assign CS001 to 5T Unit",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceId\": \"{{cs001ObjectId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}/devices",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}", "devices"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ CS001 assigned to 5T unit', () => {",
+            "  pm.expect(r.data.assignedDevices).to.be.an('array').with.length.at.least(1);",
+            "  const deviceIds = r.data.assignedDevices.map(d => d.deviceId);",
+            "  pm.expect(deviceIds).to.include('CS001');",
+            "});"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] POST /storage-units/:id/devices — Assign CS002 to 5T Unit (2nd sensor)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceId\": \"{{cs002ObjectId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}/devices",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}", "devices"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ 5T unit now has 2 devices', () => pm.expect(r.data.assignedDevices.length).to.eql(2));",
+            "pm.test('✅ CS001 and CS002 both present', () => {",
+            "  const ids = r.data.assignedDevices.map(d => d.deviceId);",
+            "  pm.expect(ids).to.include('CS001');",
+            "  pm.expect(ids).to.include('CS002');",
+            "});"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] PATCH /storage-units/:id/stock — Store 3000 kg Potatoes in 5T Unit",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentStockKg\": 3000\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}/stock",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}", "stock"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Stock updated to 3000 kg', () => pm.expect(r.data.currentStockKg).to.eql(3000));",
+            "pm.test('✅ availableCapacityKg = 2000 (5000-3000)', () => pm.expect(r.data.availableCapacityKg).to.eql(2000));",
+            "pm.test('✅ usagePercentage = 60%', () => pm.expect(r.data.usagePercentage).to.eql(60));",
+            "console.log('5T unit: stock=3000kg, available=2000kg, usage=60%');"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] PATCH /storage-units/:id/stock — Store 8500 kg in 10T Unit",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentStockKg\": 8500\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit10tId}}/stock",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit10tId}}", "stock"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Stock = 8500 kg', () => pm.expect(r.data.currentStockKg).to.eql(8500));",
+            "pm.test('✅ Available = 1500 kg', () => pm.expect(r.data.availableCapacityKg).to.eql(1500));",
+            "pm.test('✅ Usage = 85%', () => pm.expect(r.data.usagePercentage).to.eql(85));",
+            "console.log('10T unit: stock=8500kg, available=1500kg, usage=85%');"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] GET /storage-units/:id/capacity — How many kg potato fits in 5T Unit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}/capacity?vegetable=potato&addStockKg=1000",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}", "capacity"],
+              "query": [
+                {"key":"vegetable","value":"potato"},
+                {"key":"addStockKg","value":"1000"}
+              ]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Capacity report has all fields', () => {",
+            "  pm.expect(r.data).to.have.property('maxCapacityKg');",
+            "  pm.expect(r.data).to.have.property('currentStockKg');",
+            "  pm.expect(r.data).to.have.property('availableCapacityKg');",
+            "  pm.expect(r.data).to.have.property('usagePercentage');",
+            "  pm.expect(r.data).to.have.property('packingDensityKgPerM3');",
+            "  pm.expect(r.data).to.have.property('simulation');",
+            "});",
+            "pm.test('✅ maxCapacityKg = 5000', () => pm.expect(r.data.maxCapacityKg).to.eql(5000));",
+            "pm.test('✅ potato packing density = 650 kg/m³', () => pm.expect(r.data.packingDensityKgPerM3).to.eql(650));",
+            "pm.test('✅ Simulation: can add 1000 kg potato', () => {",
+            "  pm.expect(r.data.simulation.canActuallyAddKg).to.eql(1000);",
+            "  pm.expect(r.data.simulation.canFit).to.be.true;",
+            "  pm.expect(r.data.simulation.stockAfterAddKg).to.eql(4000);",
+            "});",
+            "console.log('Potato capacity report:', JSON.stringify(r.data, null, 2));"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] GET /storage-units/:id/capacity — Try to add 3000 kg (exceeds available 2000 kg)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}/capacity?vegetable=potato&addStockKg=3000",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}", "capacity"],
+              "query": [
+                {"key":"vegetable","value":"potato"},
+                {"key":"addStockKg","value":"3000"}
+              ]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ canFit = false (3000 > available 2000)', () => pm.expect(r.data.simulation.canFit).to.be.false);",
+            "pm.test('✅ canActuallyAddKg = 2000 (capped at available)', () => pm.expect(r.data.simulation.canActuallyAddKg).to.eql(2000));",
+            "console.log('Over-capacity test:', r.data.simulation);"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] GET /storage-units/:id/capacity — Onion capacity in 10T Unit",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit10tId}}/capacity?vegetable=onion",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit10tId}}", "capacity"],
+              "query": [{"key":"vegetable","value":"onion"}]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ maxCapacityKg = 10000', () => pm.expect(r.data.maxCapacityKg).to.eql(10000));",
+            "pm.test('✅ onion packing density = 550 kg/m³', () => pm.expect(r.data.packingDensityKgPerM3).to.eql(550));",
+            "pm.test('✅ currentStockKg = 8500', () => pm.expect(r.data.currentStockKg).to.eql(8500));",
+            "pm.test('✅ availableCapacityKg = 1500', () => pm.expect(r.data.availableCapacityKg).to.eql(1500));",
+            "console.log('Onion 10T report:', JSON.stringify(r.data, null, 2));"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] DELETE /storage-units/:id/devices/:deviceId — Remove CS002 from 5T Unit",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}/devices/{{cs002ObjectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}", "devices", "{{cs002ObjectId}}"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ CS002 removed, only CS001 remains', () => {",
+            "  pm.expect(r.data.assignedDevices.length).to.eql(1);",
+            "  pm.expect(r.data.assignedDevices[0].deviceId).to.eql('CS001');",
+            "});"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] DELETE /storage-units/:id/vegetable — Remove vegetable from 5T Unit",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}/vegetable",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}", "vegetable"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ assignedVegetable is null', () => pm.expect(r.data.assignedVegetable).to.be.null);"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] GET /storage-units — Filter by isActive=true",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units?isActive=true",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units"],
+              "query": [{"key":"isActive","value":"true"}]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "const r = pm.response.json();",
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ All returned units are active', () => r.data.forEach(u => pm.expect(u.isActive).to.be.true));"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] GET /storage-units — Search by name",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units?search=Chamber+A",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units"],
+              "query": [{"key":"search","value":"Chamber A"}]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200', () => pm.response.to.have.status(200));",
+            "pm.test('✅ Search returns 5T unit', () => {",
+            "  const r = pm.response.json();",
+            "  pm.expect(r.data.some(u => u.unitId === 'CS-UNIT-5T')).to.be.true;",
+            "});"
+          ]}}]
+        },
+
+        {
+          "name": "[ERR] POST /storage-units — Duplicate unitId → 409",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unitId\": \"CS-UNIT-5T\",\n  \"name\": \"Duplicate Unit\",\n  \"capacityTons\": 5,\n  \"location\": \"Block X\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/storage-units", "host": ["{{baseUrl}}"], "path": ["storage-units"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 409 — duplicate unitId', () => pm.response.to.have.status(409));",
+            "pm.test('✅ Conflict message', () => pm.expect(pm.response.json().message).to.include('already exists'));"
+          ]}}]
+        },
+
+        {
+          "name": "[ERR] POST /storage-units — Missing required fields → 400",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Incomplete Unit\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/storage-units", "host": ["{{baseUrl}}"], "path": ["storage-units"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 400 — missing unitId and capacityTons', () => pm.response.to.have.status(400));",
+            "pm.test('✅ Validation errors present', () => pm.expect(pm.response.json().errors).to.be.an('array').that.is.not.empty);"
+          ]}}]
+        },
+
+        {
+          "name": "[ERR] PATCH /storage-units/:id/stock — Exceed capacity → 400",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentStockKg\": 99999\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}/stock",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}", "stock"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 400 — stock exceeds capacity', () => pm.response.to.have.status(400));",
+            "pm.test('✅ Over-capacity error message', () => pm.expect(pm.response.json().message).to.include('exceeds'));"
+          ]}}]
+        },
+
+        {
+          "name": "[ERR] POST /storage-units/:id/devices — Duplicate device → 409",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"deviceId\": \"{{cs001ObjectId}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}/devices",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}", "devices"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 409 — device already assigned', () => pm.response.to.have.status(409));",
+            "pm.test('✅ Conflict message', () => pm.expect(pm.response.json().message).to.include('already assigned'));"
+          ]}}]
+        },
+
+        {
+          "name": "[ERR] GET /storage-units/:id — Non-existent → 404",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/507f1f77bcf86cd799439011",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "507f1f77bcf86cd799439011"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 404', () => pm.response.to.have.status(404));"
+          ]}}]
+        },
+
+        {
+          "name": "[OP] GET /storage-units — Operator can read",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200 — Operator can list storage units', () => pm.response.to.have.status(200));"
+          ]}}]
+        },
+
+        {
+          "name": "[OP] POST /storage-units — Operator cannot create → 403",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{operatorToken}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unitId\": \"OP-UNIT\",\n  \"name\": \"Op Unit\",\n  \"capacityTons\": 3,\n  \"location\": \"Block Z\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{baseUrl}}/storage-units", "host": ["{{baseUrl}}"], "path": ["storage-units"] }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 403 — Operator cannot create storage units', () => pm.response.to.have.status(403));"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] DELETE /storage-units/:id — Cleanup 5T Unit",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit5tId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit5tId}}"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200 — 5T unit deleted', () => pm.response.to.have.status(200));",
+            "pm.test('✅ success true', () => pm.expect(pm.response.json().success).to.be.true);"
+          ]}}]
+        },
+
+        {
+          "name": "[SA] DELETE /storage-units/:id — Cleanup 10T Unit",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/storage-units/{{unit10tId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["storage-units", "{{unit10tId}}"]
+            }
+          },
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "pm.test('✅ Status 200 — 10T unit deleted', () => pm.response.to.have.status(200));",
+            "pm.test('✅ success true', () => pm.expect(pm.response.json().success).to.be.true);"
+          ]}}]
+        }
+
+      ]
     }
   ]
 }
