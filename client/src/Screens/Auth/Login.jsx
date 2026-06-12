@@ -43,11 +43,11 @@ const Login = () => {
         <div className="mb-8">
           <img src={logo} alt="Smaafrost Logo" className="h-24 w-auto object-contain drop-shadow-lg" />
         </div>
-        <h1 className="text-4xl font-bold mb-4 text-center">Cold Storage Monitor</h1>
+        <h1 className="text-4xl font-bold mb-4 text-center">SMAAFROST</h1>
         <p className="text-lg text-blue-200 text-center max-w-sm">
           Real-time IoT monitoring for temperature, humidity, and door status across all storage units.
         </p>
-        <div className="mt-10 grid grid-cols-3 gap-6 w-full max-w-sm">
+        {/* <div className="mt-10 grid grid-cols-3 gap-6 w-full max-w-sm">
           {[
             { label: 'Devices', value: '5+' },
             { label: 'Vegetables', value: '6+' },
@@ -58,15 +58,15 @@ const Login = () => {
               <div className="text-xs text-blue-200 mt-1">{s.label}</div>
             </div>
           ))}
-        </div>
+        </div> */}
       </div>
 
       {/* Right panel */}
       <div className="flex justify-center items-center p-8 bg-[#f2f6fc]">
         <div className="bg-white rounded-2xl shadow-lg p-8 w-full max-w-md">
           <div className="flex items-center gap-2 mb-2 md:hidden">
-            <img src={logo} alt="Smaafrost Logo" className="h-8 w-auto object-contain" />
-            <span className="text-[#2E3A8C] font-bold text-xl">Cold Storage Monitor</span>
+            <img src={logo} alt="Smaafrost Logo" className="h-16 w-auto object-contain" />
+            <span className="text-[#2E3A8C] font-bold text-xl">SMAAFROST</span>
           </div>
 
           <h2 className="text-2xl font-bold text-[#2E3A8C] mt-2">Welcome back</h2>
@@ -124,10 +124,10 @@ const Login = () => {
             </button>
           </form>
 
-          <div className="mt-6 p-3 bg-blue-50 rounded-lg text-xs text-[#49608c]">
+          {/* <div className="mt-6 p-3 bg-blue-50 rounded-lg text-xs text-[#49608c]">
             <div className="font-semibold mb-1 text-[#2E3A8C]">Demo credentials</div>
             <div>superadmin@coldstorage.com / Admin@1234</div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>
