@@ -26,6 +26,14 @@ export const destroySocket = () => {
 };
 
 /**
+ * emitSocketEvent — sends an event on the shared socket (e.g. to join/leave a device room).
+ * Safe to call even if the socket hasn't connected yet; the connection is created lazily.
+ */
+export const emitSocketEvent = (event, payload) => {
+  getSocket().emit(event, payload);
+};
+
+/**
  * useSocket — subscribes to one or more Socket.IO events.
  *
  * @param {Record<string, Function>} handlers  Map of event → callback

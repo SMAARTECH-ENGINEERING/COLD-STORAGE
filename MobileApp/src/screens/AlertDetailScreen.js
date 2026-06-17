@@ -1,136 +1,201 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
   ActivityIndicator,
+  ScrollView,
+  Alert,
 } from 'react-native';
-import {Ionicons} from '@expo/vector-icons';
-import ScreenContainer from '../components/ScreenContainer';
+import { Ionicons } from '@expo/vector-icons';
 import SectionHeader from '../components/SectionHeader';
-import {AlertsService} from '../services/alerts.service';
-import {AuthService} from '../services/auth.service';
+import { AlertsService } from '../services/alerts.service';
 
-export default function AlertDetailScreen({route}) {
-  const {alertId, deviceId} = route.params || {};
+const SEVERITY_COLOR = {
+  low: '#10B981',
+  medium: '#F59E0B',
+  high: '#EF4444',
+  critical: '#DC2626',
+};
+
+const STATUS_BG = {
+  active: '#FEE2E2',
+  acknowledged: '#FEF3C7',
+  resolved: '#D1FAE5',
+};
+
+const STATUS_TEXT = {
+  active: '#B91C1C',
+  acknowledged: '#92400E',
+  resolved: '#065F46',
+};
+
+export default function AlertDetailScreen({ route }) {
+  const { alertId } = route.params || {};
   const [alert, setAlert] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [actioning, setActioning] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        const a = alertId ? await AlertsService.getById(alertId) : {id: '--', deviceId};
-        setAlert(a);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [alertId, deviceId]);
+    if (!alertId) { setLoading(false); return; }
+    AlertsService.getById(alertId)
+      .then(setAlert)
+      .catch((e) => setError(e?.response?.data?.message || 'Alert not found.'))
+      .finally(() => setLoading(false));
+  }, [alertId]);
 
-  const ack = async () => {
-    const user = await AuthService.getCurrentUser();
-    const r = await AlertsService.acknowledge(alert.id, user);
-    setAlert({...alert, status: r.status});
-  };
-
-  const resolve = async () => {
-    const user = await AuthService.getCurrentUser();
-    const r = await AlertsService.resolve(alert.id, user);
-    setAlert({...alert, status: r.status});
+  const doAction = async (action) => {
+    setActioning(true);
+    try {
+      const updated =
+        action === 'acknowledge'
+          ? await AlertsService.acknowledge(alert.id)
+          : await AlertsService.resolve(alert.id);
+      setAlert(updated);
+    } catch (e) {
+      Alert.alert('Error', e?.response?.data?.message || 'Action failed. Please try again.');
+    } finally {
+      setActioning(false);
+    }
   };
 
   if (loading) {
     return (
-      <ScreenContainer>
-        <View style={styles.loader}>
-          <ActivityIndicator size="large" color="#2563EB" />
-        </View>
-      </ScreenContainer>
+      <View style={styles.center}>
+        <ActivityIndicator size="large" color="#2563EB" />
+      </View>
     );
   }
 
-  if (!alert) {
+  if (error || !alert) {
     return (
-      <ScreenContainer>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyText}>Alert details are not available.</Text>
-        </View>
-      </ScreenContainer>
+      <View style={styles.center}>
+        <Text style={styles.emptyText}>{error || 'Alert details are not available.'}</Text>
+      </View>
     );
   }
+
+  const statusKey = alert.status?.toLowerCase() || 'active';
+  const severityKey = alert.severity?.toLowerCase() || 'medium';
+  const severityColor = SEVERITY_COLOR[severityKey] || '#64748B';
+  const isResolved = statusKey === 'resolved';
 
   return (
-    <ScreenContainer scroll>
+    <ScrollView style={styles.scrollRoot} contentContainerStyle={styles.container}>
       <SectionHeader title="Alert Details" />
 
       <View style={styles.card}>
         <View style={styles.topRow}>
-          <View>
+          <View style={{ flex: 1, paddingRight: 12 }}>
             <Text style={styles.title}>{alert.type}</Text>
             <Text style={styles.subtitle}>{alert.deviceName || alert.deviceId}</Text>
           </View>
-
-          <View style={styles.badgeContainer}>
-            <View style={[styles.badge, styles.severityBadge]}>
-              <Text style={styles.badgeText}>{alert.severity}</Text>
+          <View style={styles.badges}>
+            <View style={[styles.badge, { backgroundColor: severityColor + '22' }]}>
+              <Text style={[styles.badgeText, { color: severityColor }]}>
+                {alert.severity?.toUpperCase()}
+              </Text>
             </View>
-            <View style={[styles.badge, styles.statusBadge]}>
-              <Text style={styles.statusText}>{alert.status}</Text>
+            <View
+              style={[
+                styles.badge,
+                { backgroundColor: STATUS_BG[statusKey] || '#F1F5F9' },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.badgeText,
+                  { color: STATUS_TEXT[statusKey] || '#334155' },
+                ]}
+              >
+                {alert.status?.toUpperCase()}
+              </Text>
             </View>
           </View>
         </View>
 
         {alert.message ? <Text style={styles.message}>{alert.message}</Text> : null}
 
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Device ID</Text>
-          <Text style={styles.detailValue}>{alert.deviceId || '--'}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Created</Text>
-          <Text style={styles.detailValue}>{alert.createdAt ? new Date(alert.createdAt).toLocaleString() : 'Unknown'}</Text>
+        <View style={styles.detailList}>
+          <DetailRow label="Device ID" value={alert.deviceId || '--'} />
+          <DetailRow
+            label="Created"
+            value={alert.createdAt ? new Date(alert.createdAt).toLocaleString() : 'Unknown'}
+          />
+          {alert.value != null && (
+            <DetailRow label="Measured Value" value={String(alert.value)} />
+          )}
+          {alert.threshold != null && (
+            <DetailRow label="Threshold" value={String(alert.threshold)} />
+          )}
+          {alert.acknowledgedAt && (
+            <DetailRow
+              label="Acknowledged"
+              value={new Date(alert.acknowledgedAt).toLocaleString()}
+            />
+          )}
+          {alert.resolvedAt && (
+            <DetailRow
+              label="Resolved"
+              value={new Date(alert.resolvedAt).toLocaleString()}
+            />
+          )}
         </View>
       </View>
 
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={[styles.actionButton, styles.primaryButton]} onPress={ack}>
-          <Ionicons name="checkmark-done-outline" size={18} color="#fff" />
-          <Text style={styles.actionText}>Acknowledge</Text>
-        </TouchableOpacity>
+      {!isResolved && (
+        <View style={styles.buttonRow}>
+          {statusKey === 'active' && (
+            <TouchableOpacity
+              style={[styles.actionButton, styles.primaryButton]}
+              onPress={() => doAction('acknowledge')}
+              disabled={actioning}
+            >
+              <Ionicons name="checkmark-done-outline" size={18} color="#fff" />
+              <Text style={styles.actionText}>
+                {actioning ? 'Processing…' : 'Acknowledge'}
+              </Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.actionButton, styles.secondaryButton]}
+            onPress={() => doAction('resolve')}
+            disabled={actioning}
+          >
+            <Ionicons name="shield-checkmark-outline" size={18} color="#2563EB" />
+            <Text style={[styles.actionText, styles.secondaryText]}>
+              {actioning ? 'Processing…' : 'Resolve'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </ScrollView>
+  );
+}
 
-        <TouchableOpacity style={[styles.actionButton, styles.secondaryButton]} onPress={resolve}>
-          <Ionicons name="shield-checkmark-outline" size={18} color="#2563EB" />
-          <Text style={[styles.actionText, styles.secondaryText]}>Resolve</Text>
-        </TouchableOpacity>
-      </View>
-    </ScreenContainer>
+function DetailRow({ label, value }) {
+  return (
+    <View style={styles.detailRow}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  loader: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  emptyState: {
-    padding: 24,
-    alignItems: 'center',
-  },
-  emptyText: {
-    color: '#64748B',
-    fontSize: 15,
-  },
+  scrollRoot: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { padding: 16, paddingBottom: 40 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  emptyText: { color: '#64748B', fontSize: 15, textAlign: 'center' },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 20,
     padding: 20,
     marginBottom: 18,
     shadowColor: '#0f172a',
-    shadowOffset: {width: 0, height: 8},
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.06,
     shadowRadius: 18,
     elevation: 4,
@@ -141,67 +206,17 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: 18,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#0f172a',
-  },
-  subtitle: {
-    marginTop: 6,
-    color: '#64748B',
-    fontSize: 14,
-  },
-  badgeContainer: {
-    alignItems: 'flex-end',
-  },
-  badge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    marginBottom: 8,
-  },
-  severityBadge: {
-    backgroundColor: '#FEE2E2',
-  },
-  statusBadge: {
-    backgroundColor: '#DBEAFE',
-  },
-  badgeText: {
-    color: '#B91C1C',
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  statusText: {
-    color: '#2563EB',
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  message: {
-    color: '#475569',
-    lineHeight: 22,
-    marginBottom: 20,
-    fontSize: 15,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  detailLabel: {
-    color: '#94A3B8',
-    fontSize: 13,
-  },
-  detailValue: {
-    color: '#0F172A',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
+  title: { fontSize: 20, fontWeight: '800', color: '#0f172a' },
+  subtitle: { marginTop: 6, color: '#64748B', fontSize: 14 },
+  badges: { alignItems: 'flex-end', gap: 6 },
+  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
+  badgeText: { fontSize: 11, fontWeight: '700' },
+  message: { color: '#475569', lineHeight: 22, marginBottom: 20, fontSize: 15 },
+  detailList: { borderTopWidth: 1, borderTopColor: '#E2E8F0', paddingTop: 16 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  detailLabel: { color: '#94A3B8', fontSize: 13 },
+  detailValue: { color: '#0F172A', fontWeight: '700', fontSize: 13, maxWidth: '55%', textAlign: 'right' },
+  buttonRow: { flexDirection: 'row', gap: 12 },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
@@ -210,22 +225,9 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 16,
     borderWidth: 1,
-    marginHorizontal: 4,
   },
-  primaryButton: {
-    backgroundColor: '#2563EB',
-    borderColor: '#2563EB',
-  },
-  secondaryButton: {
-    backgroundColor: '#ffffff',
-    borderColor: '#DBEAFE',
-  },
-  actionText: {
-    color: '#ffffff',
-    fontWeight: '700',
-    marginLeft: 8,
-  },
-  secondaryText: {
-    color: '#2563EB',
-  },
+  primaryButton: { backgroundColor: '#2563EB', borderColor: '#2563EB' },
+  secondaryButton: { backgroundColor: '#ffffff', borderColor: '#DBEAFE' },
+  actionText: { color: '#ffffff', fontWeight: '700', marginLeft: 8 },
+  secondaryText: { color: '#2563EB' },
 });

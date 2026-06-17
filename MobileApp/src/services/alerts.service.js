@@ -1,20 +1,45 @@
-import {alerts as mockAlerts} from '../data/alertsData';
+import api from './axios.instance';
+
+function adaptAlert(a) {
+  return {
+    id: a._id,
+    deviceId: a.device?.deviceId || a.deviceId || '',
+    deviceName: a.device?.name || '',
+    type: a.alertType || a.type || 'Unknown',
+    severity: a.severity,
+    message: a.message || '',
+    status: a.status
+      ? a.status.charAt(0).toUpperCase() + a.status.slice(1)
+      : 'Active',
+    value: a.value,
+    threshold: a.threshold,
+    createdAt: a.createdAt,
+    acknowledgedAt: a.acknowledgedAt,
+    resolvedAt: a.resolvedAt,
+  };
+}
 
 export const AlertsService = {
   list: async (filter) => {
-    // filter: Active, Acknowledged, Resolved
-    if (!filter || filter === 'All') return Promise.resolve(mockAlerts);
-    return Promise.resolve(mockAlerts.filter(a => a.status === filter));
+    const params = { limit: 100, sortBy: 'createdAt:desc' };
+    if (filter && filter !== 'All') params.status = filter.toLowerCase();
+
+    const { data } = await api.get('/alerts', { params });
+    return (data.data || []).map(adaptAlert);
   },
+
   getById: async (id) => {
-    return Promise.resolve(mockAlerts.find(a => a.id === id));
+    const { data } = await api.get(`/alerts/${id}`);
+    return adaptAlert(data.data);
   },
-  acknowledge: async (id, user) => {
-    // TODO: send acknowledge to backend
-    return Promise.resolve({id, status: 'Acknowledged', by: user});
+
+  acknowledge: async (id) => {
+    const { data } = await api.patch(`/alerts/${id}/acknowledge`);
+    return adaptAlert(data.data);
   },
-  resolve: async (id, user) => {
-    // TODO: send resolve to backend
-    return Promise.resolve({id, status: 'Resolved', by: user});
-  }
+
+  resolve: async (id) => {
+    const { data } = await api.patch(`/alerts/${id}/resolve`);
+    return adaptAlert(data.data);
+  },
 };

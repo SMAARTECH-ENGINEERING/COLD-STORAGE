@@ -24,6 +24,16 @@ class SensorReadingRepository extends BaseRepository {
     return { data, total };
   }
 
+  async getHistoricalForExport(deviceId, startDate, endDate, maxRows = 5000) {
+    return this.model.find({
+      deviceId: deviceId.toUpperCase(),
+      timestamp: { $gte: startDate, $lte: endDate },
+    })
+      .sort({ timestamp: 1 })
+      .limit(maxRows)
+      .exec();
+  }
+
   async getTemperatureStats(deviceId, hours = 24) {
     const since = new Date(Date.now() - hours * 60 * 60 * 1000);
     const pipeline = [

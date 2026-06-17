@@ -3,7 +3,10 @@ const deviceRepository = require('../repositories/DeviceRepository');
 const alertService = require('./AlertService');
 const ApiError = require('../utils/ApiError');
 const { getPaginationParams } = require('../utils/pagination');
+const { buildSensorHistoryExcel, buildSensorHistoryPdf } = require('../utils/reportExport');
 const logger = require('../config/logger');
+
+const RANGE_TO_HOURS = { '6h': 6, '24h': 24, '7d': 168 };
 
 class SensorService {
   constructor() {
@@ -125,6 +128,27 @@ class SensorService {
     const device = await deviceRepository.findByDeviceId(deviceId);
     if (!device) throw ApiError.notFound(`Device '${deviceId}' not found`);
     return sensorReadingRepository.getTemperatureStats(deviceId, hours);
+  }
+
+  async exportHistory(deviceId, query, format) {
+    if (!['xlsx', 'pdf'].includes(format)) {
+      throw ApiError.badRequest('format must be "xlsx" or "pdf"');
+    }
+
+    const device = await deviceRepository.findByDeviceId(deviceId);
+    if (!device) throw ApiError.notFound(`Device '${deviceId}' not found`);
+
+    const hours = RANGE_TO_HOURS[query.range] || 24;
+    const startDate = query.startDate ? new Date(query.startDate) : new Date(Date.now() - hours * 60 * 60 * 1000);
+    const endDate = query.endDate ? new Date(query.endDate) : new Date();
+
+    const readings = await sensorReadingRepository.getHistoricalForExport(deviceId, startDate, endDate);
+
+    const buffer = format === 'xlsx'
+      ? await buildSensorHistoryExcel(device, readings, { startDate, endDate })
+      : await buildSensorHistoryPdf(device, readings, { startDate, endDate });
+
+    return { buffer, device };
   }
 }
 

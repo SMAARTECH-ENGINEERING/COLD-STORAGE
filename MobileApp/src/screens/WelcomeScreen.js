@@ -6,13 +6,14 @@ import {
   TouchableOpacity,
   StatusBar,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 const Feature = ({ icon, title, desc }) => (
   <View style={styles.featureRow}>
     <View style={styles.featureIcon}>
-      <Ionicons name={icon} size={22} color="#2563EB" />
+      <Ionicons name={icon} size={22} color="#1E3A8A" />
     </View>
     <View style={styles.featureText}>
       <Text style={styles.featureTitle}>{title}</Text>
@@ -24,21 +25,32 @@ const Feature = ({ icon, title, desc }) => (
 export default function WelcomeScreen({ onGetStarted }) {
   return (
     <SafeAreaView style={styles.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#2563EB" />
+      <StatusBar barStyle="light-content" backgroundColor="#1E3A8A" />
 
-      {/* Top hero section */}
+      {/* ── Hero ── */}
       <View style={styles.hero}>
+        {/* Icon logo */}
         <View style={styles.logoWrap}>
-          <Text style={styles.logoEmoji}>❄️</Text>
+          <Image
+            source={require('../assets/logo.png')}
+            style={styles.logoImg}
+            resizeMode="contain"
+          />
         </View>
-        <Text style={styles.appName}>Cold Storage</Text>
-        <Text style={styles.appName2}>Monitor</Text>
+
+        {/* Text logo */}
+        <Image
+          source={require('../assets/logo-text.png')}
+          style={styles.logoText}
+          resizeMode="contain"
+        />
+
         <Text style={styles.tagline}>
-          Real-time insight into your cold storage devices — anywhere, anytime.
+          Real-time insight into your cold storage units — anywhere, anytime.
         </Text>
       </View>
 
-      {/* Features card */}
+      {/* ── Feature card ── */}
       <View style={styles.card}>
         <Feature
           icon="thermometer-outline"
@@ -72,10 +84,7 @@ export default function WelcomeScreen({ onGetStarted }) {
 }
 
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: '#2563EB',
-  },
+  root: { flex: 1, backgroundColor: '#1E3A8A' },
 
   hero: {
     flex: 1,
@@ -83,42 +92,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
     paddingTop: 20,
+    gap: 16,
   },
-
   logoWrap: {
-    width: 100,
-    height: 100,
+    width: 110,
+    height: 110,
     borderRadius: 28,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 10,
   },
-
-  logoEmoji: {
-    fontSize: 48,
+  logoImg: { width: 88, height: 88 },
+  logoText: {
+    width: 220,
+    height: 52,
   },
-
-  appName: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.5,
-  },
-
-  appName2: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.7)',
-    letterSpacing: 0.5,
-    marginBottom: 16,
-  },
-
   tagline: {
-    fontSize: 15,
-    color: 'rgba(255,255,255,0.82)',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.78)',
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 21,
     maxWidth: 300,
   },
 
@@ -129,13 +127,7 @@ const styles = StyleSheet.create({
     padding: 28,
     paddingBottom: 40,
   },
-
-  featureRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-  },
-
+  featureRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 14 },
   featureIcon: {
     width: 48,
     height: 48,
@@ -145,31 +137,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginRight: 16,
   },
-
-  featureText: {
-    flex: 1,
-  },
-
-  featureTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-
-  featureDesc: {
-    fontSize: 13,
-    color: '#64748B',
-    marginTop: 3,
-    lineHeight: 18,
-  },
-
-  divider: {
-    height: 1,
-    backgroundColor: '#F1F5F9',
-  },
+  featureText: { flex: 1 },
+  featureTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
+  featureDesc: { fontSize: 13, color: '#64748B', marginTop: 3, lineHeight: 18 },
+  divider: { height: 1, backgroundColor: '#F1F5F9' },
 
   btn: {
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1E3A8A',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -177,11 +151,11 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 16,
     marginTop: 28,
+    shadowColor: '#1E3A8A',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 12,
+    elevation: 6,
   },
-
-  btnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  btnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });

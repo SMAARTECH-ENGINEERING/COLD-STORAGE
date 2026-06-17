@@ -52,4 +52,12 @@ router.get(
   sensorController.getStats
 );
 
+router.get(
+  '/:deviceId/export',
+  authenticate,
+  requirePermission('sensors', 'read'),
+  checkDeviceAccess,
+  sensorController.exportHistory
+);
+
 module.exports = router;

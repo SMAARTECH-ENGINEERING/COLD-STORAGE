@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { toast } from 'react-toastify';
+import DataTable from 'react-data-table-component';
 import { FiSearch, FiTrash2, FiCheckCircle, FiAlertTriangle, FiRefreshCw } from 'react-icons/fi';
 import { MdOutlineDoneAll } from 'react-icons/md';
 import Dialog from '@mui/material/Dialog';
@@ -33,14 +34,72 @@ const SEVERITIES = ['low', 'medium', 'high', 'critical'];
 const TYPES      = Object.keys(alertTypeLabel);
 const DIALOG_PAPER = { sx: { borderRadius: '12px' } };
 
-const RowSkeleton = React.memo(() => (
-  <tr>
-    {Array(7).fill(0).map((_, i) => (
-      <td key={i} className="px-5 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td>
+const tableCustomStyles = {
+  tableWrapper: {
+    style: {
+      borderRadius: '12px',
+      overflow: 'hidden',
+    },
+  },
+  headRow: {
+    style: {
+      backgroundColor: '#f2f6fc',
+      borderBottomWidth: '0',
+      minHeight: '40px',
+    },
+  },
+  headCells: {
+    style: {
+      color: '#49608c',
+      fontSize: '11px',
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+      paddingLeft: '20px',
+      paddingRight: '20px',
+    },
+  },
+  rows: {
+    style: {
+      fontSize: '13px',
+      borderBottomColor: '#f9fafb',
+      minHeight: '52px',
+      '&:hover': { backgroundColor: '#f9fafb' },
+    },
+  },
+  cells: {
+    style: {
+      paddingLeft: '20px',
+      paddingRight: '20px',
+    },
+  },
+  pagination: {
+    style: {
+      borderTopColor: '#f3f4f6',
+      fontSize: '12px',
+      color: '#9ca3af',
+    },
+  },
+};
+
+const LoadingSkeleton = () => (
+  <div className="divide-y divide-gray-50">
+    {Array(6).fill(0).map((_, i) => (
+      <div key={i} className="flex gap-4 px-5 py-3.5">
+        {Array(7).fill(0).map((__, j) => (
+          <div key={j} className="h-4 bg-gray-100 rounded animate-pulse flex-1" />
+        ))}
+      </div>
     ))}
-  </tr>
-));
-RowSkeleton.displayName = 'RowSkeleton';
+  </div>
+);
+
+const NoDataComponent = () => (
+  <div className="py-12 text-center">
+    <FiAlertTriangle size={32} className="mx-auto text-gray-300 mb-2" />
+    <p className="text-gray-400 text-sm">No alerts found</p>
+  </div>
+);
 
 const Alerts = () => {
   const { isAdmin } = useAuth();
@@ -159,6 +218,112 @@ const Alerts = () => {
     [alerts, search]
   );
 
+  const columns = useMemo(() => [
+    {
+      name: 'Type',
+      minWidth: '110px',
+      cell: (a) => (
+        <span className="text-xs font-medium text-[#49608c] bg-gray-100 px-2 py-0.5 rounded whitespace-nowrap">
+          {alertTypeLabel[a.alertType] || a.alertType}
+        </span>
+      ),
+    },
+    {
+      name: 'Device',
+      minWidth: '120px',
+      cell: (a) => (
+        <div>
+          <div className="text-xs font-mono text-[#2E3A8C]">{a.deviceId}</div>
+          {a.device?.name && <div className="text-xs text-gray-400">{a.device.name}</div>}
+        </div>
+      ),
+    },
+    {
+      name: 'Severity',
+      minWidth: '100px',
+      cell: (a) => (
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium border capitalize ${severityColor[a.severity] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+          {a.severity}
+        </span>
+      ),
+    },
+    {
+      name: 'Message',
+      minWidth: '200px',
+      grow: 2,
+      cell: (a) => (
+        <div className="py-1">
+          <span className="text-xs text-[#49608c] line-clamp-2">{a.message}</span>
+          {a.value != null && (
+            <span className="text-gray-400 text-xs block mt-0.5">
+              Value: {a.value}{a.threshold != null ? ` / Limit: ${a.threshold}` : ''}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      name: 'Status',
+      minWidth: '110px',
+      cell: (a) => (
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${statusColor[a.status]}`}>
+          {a.status}
+        </span>
+      ),
+    },
+    {
+      name: 'Time',
+      minWidth: '150px',
+      cell: (a) => (
+        <span className="text-xs text-[#49608c] whitespace-nowrap">
+          {new Date(a.createdAt).toLocaleString()}
+        </span>
+      ),
+    },
+    {
+      name: 'Actions',
+      right: true,
+      minWidth: '110px',
+      cell: (a) => (
+        <div className="flex items-center gap-1">
+          {a.status === 'active' && (
+            <button
+              onClick={() => handleAcknowledge(a._id)}
+              disabled={actionLoading[a._id] === 'ack'}
+              title="Acknowledge"
+              className="p-1.5 text-yellow-500 hover:text-yellow-700 hover:bg-yellow-50 rounded-lg transition-colors disabled:opacity-40"
+            >
+              {actionLoading[a._id] === 'ack'
+                ? <div className="w-3.5 h-3.5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                : <FiCheckCircle size={15} />}
+            </button>
+          )}
+          {(a.status === 'active' || a.status === 'acknowledged') && (
+            <button
+              onClick={() => handleResolve(a._id)}
+              disabled={actionLoading[a._id] === 'resolve'}
+              title="Resolve"
+              className="p-1.5 text-green-500 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-40"
+            >
+              {actionLoading[a._id] === 'resolve'
+                ? <div className="w-3.5 h-3.5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
+                : <MdOutlineDoneAll size={16} />}
+            </button>
+          )}
+          {isAdmin && (
+            <button
+              onClick={() => setDeleteTarget(a)}
+              title="Delete"
+              className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            >
+              <FiTrash2 size={15} />
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ], [isAdmin, actionLoading, handleAcknowledge, handleResolve]);
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -212,109 +377,25 @@ const Alerts = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#f2f6fc] text-[#49608c] text-xs uppercase">
-                <th className="text-left px-5 py-3 font-semibold">Type</th>
-                <th className="text-left px-5 py-3 font-semibold">Device</th>
-                <th className="text-left px-5 py-3 font-semibold">Severity</th>
-                <th className="text-left px-5 py-3 font-semibold w-64">Message</th>
-                <th className="text-left px-5 py-3 font-semibold">Status</th>
-                <th className="text-left px-5 py-3 font-semibold">Time</th>
-                <th className="text-right px-5 py-3 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading
-                ? Array(6).fill(0).map((_, i) => <RowSkeleton key={i} />)
-                : filtered.length === 0
-                  ? (
-                    <tr>
-                      <td colSpan={7} className="text-center py-12">
-                        <FiAlertTriangle size={32} className="mx-auto text-gray-300 mb-2" />
-                        <p className="text-gray-400 text-sm">No alerts found</p>
-                      </td>
-                    </tr>
-                  )
-                  : filtered.map((alert) => (
-                    <tr key={alert._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-5 py-3">
-                        <span className="text-xs font-medium text-[#49608c] bg-gray-100 px-2 py-0.5 rounded whitespace-nowrap">
-                          {alertTypeLabel[alert.alertType] || alert.alertType}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="text-xs font-mono text-[#2E3A8C]">{alert.deviceId}</div>
-                        {alert.device?.name && (
-                          <div className="text-xs text-gray-400">{alert.device.name}</div>
-                        )}
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium border capitalize ${severityColor[alert.severity] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                          {alert.severity}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-xs text-[#49608c] max-w-xs">
-                        <span className="line-clamp-2">{alert.message}</span>
-                        {alert.value != null && (
-                          <span className="text-gray-400 block mt-0.5">
-                            Value: {alert.value}{alert.threshold != null ? ` / Limit: ${alert.threshold}` : ''}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${statusColor[alert.status]}`}>
-                          {alert.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-xs text-[#49608c] whitespace-nowrap">
-                        {new Date(alert.createdAt).toLocaleString()}
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center justify-end gap-1">
-                          {alert.status === 'active' && (
-                            <button onClick={() => handleAcknowledge(alert._id)} disabled={actionLoading[alert._id] === 'ack'} title="Acknowledge"
-                              className="p-1.5 text-yellow-500 hover:text-yellow-700 hover:bg-yellow-50 rounded-lg transition-colors disabled:opacity-40">
-                              {actionLoading[alert._id] === 'ack'
-                                ? <div className="w-3.5 h-3.5 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
-                                : <FiCheckCircle size={15} />}
-                            </button>
-                          )}
-                          {(alert.status === 'active' || alert.status === 'acknowledged') && (
-                            <button onClick={() => handleResolve(alert._id)} disabled={actionLoading[alert._id] === 'resolve'} title="Resolve"
-                              className="p-1.5 text-green-500 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-40">
-                              {actionLoading[alert._id] === 'resolve'
-                                ? <div className="w-3.5 h-3.5 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
-                                : <MdOutlineDoneAll size={16} />}
-                            </button>
-                          )}
-                          {isAdmin && (
-                            <button onClick={() => setDeleteTarget(alert)} title="Delete"
-                              className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                              <FiTrash2 size={15} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-            </tbody>
-          </table>
-        </div>
-
-        {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-            <span className="text-xs text-gray-400">
-              Page {page} of {pagination.totalPages} · {pagination.total} alerts
-            </span>
-            <div className="flex gap-2">
-              <button disabled={!pagination.hasPrevPage} onClick={() => setPage((p) => p - 1)} className="px-3 py-1 text-xs border rounded-lg disabled:opacity-40 hover:bg-gray-50 bg-white">Prev</button>
-              <button disabled={!pagination.hasNextPage} onClick={() => setPage((p) => p + 1)} className="px-3 py-1 text-xs border rounded-lg disabled:opacity-40 hover:bg-gray-50 bg-white">Next</button>
-            </div>
-          </div>
-        )}
+      <div className="bg-white rounded-xl shadow-sm">
+        <DataTable
+          columns={columns}
+          data={filtered}
+          progressPending={loading}
+          progressComponent={<LoadingSkeleton />}
+          noDataComponent={<NoDataComponent />}
+          customStyles={tableCustomStyles}
+          responsive
+          pagination
+          paginationServer
+          paginationTotalRows={pagination.total}
+          paginationPerPage={limit}
+          paginationDefaultPage={page}
+          onChangePage={(p) => setPage(p)}
+          paginationComponentOptions={{ noRowsPerPage: true }}
+          highlightOnHover
+          persistTableHead
+        />
       </div>
 
       {/* Delete Confirm */}

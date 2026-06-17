@@ -1,22 +1,50 @@
 import * as SecureStore from 'expo-secure-store';
-import {profile as mockProfile} from '../data/profileData';
+import api from './axios.instance';
+import { TOKEN_KEYS } from '../config/env';
 
-const KEY = 'COLD_APP_USER';
+function adaptUser(u) {
+  if (!u) return null;
+  return {
+    id: u._id,
+    name: u.name,
+    email: u.email,
+    phone: u.phone || '',
+    role: u.role?.displayName || u.role?.name || (typeof u.role === 'string' ? u.role : 'user'),
+    assignedDevices: (u.assignedDevices || []).map((d) =>
+      typeof d === 'object' ? d.name || d.deviceId : d
+    ),
+    isActive: u.isActive,
+  };
+}
 
 export const AuthService = {
   login: async (email, password) => {
-    // TODO: Replace mock with Axios call to /auth/login
-    const user = {...mockProfile};
-    await SecureStore.setItemAsync(KEY, JSON.stringify(user));
-    return user;
+    const { data } = await api.post('/auth/login', { email, password });
+    const { accessToken, refreshToken, user } = data.data;
+    await SecureStore.setItemAsync(TOKEN_KEYS.ACCESS, accessToken);
+    await SecureStore.setItemAsync(TOKEN_KEYS.REFRESH, refreshToken);
+    return adaptUser(user);
   },
+
   logout: async () => {
-    await SecureStore.deleteItemAsync(KEY);
-    return true;
+    try {
+      const refreshToken = await SecureStore.getItemAsync(TOKEN_KEYS.REFRESH);
+      if (refreshToken) await api.post('/auth/logout', { refreshToken });
+    } catch {
+      // Best-effort server logout; always clear locally
+    }
+    await SecureStore.deleteItemAsync(TOKEN_KEYS.ACCESS);
+    await SecureStore.deleteItemAsync(TOKEN_KEYS.REFRESH);
   },
+
   getCurrentUser: async () => {
-    const raw = await SecureStore.getItemAsync(KEY);
-    if (!raw) return null;
-    try { return JSON.parse(raw); } catch (e) { return null; }
-  }
+    const token = await SecureStore.getItemAsync(TOKEN_KEYS.ACCESS);
+    if (!token) return null;
+    try {
+      const { data } = await api.get('/auth/me');
+      return adaptUser(data.data);
+    } catch {
+      return null;
+    }
+  },
 };

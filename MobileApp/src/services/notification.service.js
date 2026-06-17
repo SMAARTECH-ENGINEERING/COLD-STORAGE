@@ -1,37 +1,55 @@
-// Expo Notifications service template with helper functions
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: true,
+  }),
+});
+
+// Expo Go doesn't support remote push notifications since SDK 53
+const isExpoGo = Constants.appOwnership === 'expo';
 
 export const NotificationService = {
   init: async () => {
-    // TODO: request permissions and register for push
-    return;
+    const { status: existing } = await Notifications.getPermissionsAsync();
+    let finalStatus = existing;
+
+    if (existing !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') return null;
+
+    if (Platform.OS === 'android') {
+      await Notifications.setNotificationChannelAsync('alerts', {
+        name: 'Device Alerts',
+        importance: Notifications.AndroidImportance.MAX,
+        vibrationPattern: [0, 250, 250, 250],
+        lightColor: '#2563EB',
+      });
+    }
+
+    // Push token is only available in a development build or production build
+    if (isExpoGo) return null;
+
+    try {
+      const token = await Notifications.getExpoPushTokenAsync();
+      return token.data;
+    } catch {
+      return null;
+    }
   },
-  showTemperatureAlert: (device, value) => {
-    // Mock notification
+
+  showLocalAlert: (title, body, channelId = 'alerts') => {
     Notifications.scheduleNotificationAsync({
-      content: {
-        title: `Temperature Alert - ${device.name}`,
-        body: `Temperature ${value}° - check device ${device.id}`
-      },
-      trigger: null
+      content: { title, body, sound: true },
+      trigger: null,
+      ...(Platform.OS === 'android' && { android: { channelId } }),
     });
   },
-  showHumidityAlert: (device, value) => {
-    Notifications.scheduleNotificationAsync({
-      content: {title: `Humidity Alert - ${device.name}`, body: `Humidity ${value}%`},
-      trigger: null
-    });
-  },
-  showDoorAlert: (device) => {
-    Notifications.scheduleNotificationAsync({
-      content: {title: `Door Alert - ${device.name}`, body: `Door opened`},
-      trigger: null
-    });
-  },
-  showOfflineAlert: (device) => {
-    Notifications.scheduleNotificationAsync({
-      content: {title: `Device Offline - ${device.name}`, body: `Device appears offline`},
-      trigger: null
-    });
-  }
 };

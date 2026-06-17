@@ -11,3 +11,6 @@ export const getSensorStats = (deviceId, hours = 24) =>
 
 export const ingestReading = (data) =>
   api.post('/sensors', data);
+
+export const exportSensorHistory = (deviceId, params) =>
+  api.get(`/sensors/${deviceId}/export`, { params, responseType: 'blob' });

@@ -1,5 +1,6 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { toast } from 'react-toastify';
+import DataTable from 'react-data-table-component';
 import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiCheck, FiX, FiRefreshCw, FiCpu } from 'react-icons/fi';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -21,16 +22,69 @@ const emptyForm = { name: '', email: '', password: '', role: 'operator', phone: 
 const DIALOG_PAPER    = { sx: { borderRadius: '12px' } };
 const DIALOG_PAPER_LG = { sx: { borderRadius: '12px', maxHeight: '80vh' } };
 
-const RowSkeleton = React.memo(({ cols }) => (
-  <tr>
-    {Array(cols).fill(0).map((_, i) => (
-      <td key={i} className="px-5 py-3">
-        <div className="h-4 bg-gray-100 rounded animate-pulse w-3/4" />
-      </td>
+const tableCustomStyles = {
+  tableWrapper: {
+    style: {
+      borderRadius: '12px',
+      overflow: 'hidden',
+    },
+  },
+  headRow: {
+    style: {
+      backgroundColor: '#f2f6fc',
+      borderBottomWidth: '0',
+      minHeight: '40px',
+    },
+  },
+  headCells: {
+    style: {
+      color: '#49608c',
+      fontSize: '11px',
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+      paddingLeft: '20px',
+      paddingRight: '20px',
+    },
+  },
+  rows: {
+    style: {
+      fontSize: '13px',
+      borderBottomColor: '#f9fafb',
+      minHeight: '52px',
+      '&:hover': { backgroundColor: '#f9fafb' },
+    },
+  },
+  cells: {
+    style: {
+      paddingLeft: '20px',
+      paddingRight: '20px',
+    },
+  },
+  pagination: {
+    style: {
+      borderTopColor: '#f3f4f6',
+      fontSize: '12px',
+      color: '#9ca3af',
+    },
+  },
+};
+
+const LoadingSkeleton = () => (
+  <div className="divide-y divide-gray-50">
+    {Array(5).fill(0).map((_, i) => (
+      <div key={i} className="flex gap-4 px-5 py-3.5">
+        {Array(7).fill(0).map((__, j) => (
+          <div key={j} className="h-4 bg-gray-100 rounded animate-pulse flex-1" />
+        ))}
+      </div>
     ))}
-  </tr>
-));
-RowSkeleton.displayName = 'RowSkeleton';
+  </div>
+);
+
+const NoDataComponent = () => (
+  <div className="py-12 text-center text-gray-400 text-sm">No users found</div>
+);
 
 const Users = () => {
   const { isSuperAdmin, isAdmin } = useAuth();
@@ -52,7 +106,6 @@ const Users = () => {
   const [deleting, setDeleting]         = useState(false);
   const [toggling, setToggling]         = useState({});
 
-  // Assign-devices modal
   const [devModalOpen, setDevModalOpen]     = useState(false);
   const [devTarget, setDevTarget]           = useState(null);
   const [allDevices, setAllDevices]         = useState([]);
@@ -159,10 +212,8 @@ const Users = () => {
     }
   }, [load]);
 
-  /* ── Assign Devices ──────────────────────────────────────────────────── */
   const openDevModal = useCallback(async (u) => {
     setDevTarget(u);
-    // Pre-select currently assigned devices (handles both populated objects and bare IDs)
     const current = new Set(
       (u.assignedDevices || []).map((d) => (typeof d === 'string' ? d : d._id?.toString()))
     );
@@ -217,9 +268,98 @@ const Users = () => {
     }
   };
 
+  const columns = useMemo(() => [
+    {
+      name: 'Name',
+      minWidth: '160px',
+      cell: (u) => (
+        <div className="flex items-center gap-2 py-1">
+          <div className="w-8 h-8 bg-[#2E3A8C] rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            {u.name?.charAt(0).toUpperCase()}
+          </div>
+          <span className="font-medium text-[#2E3A8C] text-sm">{u.name}</span>
+        </div>
+      ),
+    },
+    {
+      name: 'Email',
+      minWidth: '180px',
+      cell: (u) => <span className="text-xs text-[#49608c]">{u.email}</span>,
+    },
+    {
+      name: 'Role',
+      minWidth: '110px',
+      cell: (u) => (
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${roleColor[u.role?.name] || 'bg-gray-100 text-gray-600'}`}>
+          {u.role?.displayName || u.role?.name}
+        </span>
+      ),
+    },
+    {
+      name: 'Status',
+      minWidth: '90px',
+      cell: (u) => (
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+          {u.isActive ? 'Active' : 'Inactive'}
+        </span>
+      ),
+    },
+    {
+      name: 'Devices',
+      minWidth: '100px',
+      cell: (u) => (
+        u.assignedDevices?.length > 0
+          ? <span className="text-xs bg-blue-50 text-[#2E3A8C] px-2 py-0.5 rounded-full border border-blue-100 font-medium">
+              {u.assignedDevices.length} device{u.assignedDevices.length > 1 ? 's' : ''}
+            </span>
+          : <span className="text-xs text-gray-400">None</span>
+      ),
+    },
+    {
+      name: 'Last Login',
+      minWidth: '120px',
+      cell: (u) => (
+        <span className="text-xs text-[#49608c]">
+          {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'}
+        </span>
+      ),
+    },
+    {
+      name: 'Actions',
+      right: true,
+      minWidth: '130px',
+      cell: (u) => (
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => toggleActive(u)}
+            disabled={toggling[u._id]}
+            title={u.isActive ? 'Deactivate' : 'Activate'}
+            className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${u.isActive ? 'text-red-400 hover:bg-red-50' : 'text-green-500 hover:bg-green-50'}`}
+          >
+            {toggling[u._id]
+              ? <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+              : u.isActive ? <FiX size={15} /> : <FiCheck size={15} />}
+          </button>
+          <button onClick={() => openEdit(u)} className="p-1.5 text-[#49608c] hover:text-[#2E3A8C] hover:bg-blue-50 rounded-lg transition-colors" title="Edit user">
+            <FiEdit2 size={15} />
+          </button>
+          {isAdmin && (
+            <button onClick={() => openDevModal(u)} className="p-1.5 text-[#49608c] hover:text-[#2E3A8C] hover:bg-blue-50 rounded-lg transition-colors" title="Assign devices">
+              <FiCpu size={15} />
+            </button>
+          )}
+          {isSuperAdmin && (
+            <button onClick={() => setDeleteTarget(u)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete user">
+              <FiTrash2 size={15} />
+            </button>
+          )}
+        </div>
+      ),
+    },
+  ], [isAdmin, isSuperAdmin, toggling, toggleActive, openEdit, openDevModal]);
+
   return (
     <div className="space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-[#2E3A8C]">Users</h1>
@@ -257,104 +397,25 @@ const Users = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#f2f6fc] text-[#49608c] text-xs uppercase">
-                <th className="text-left px-5 py-3 font-semibold">Name</th>
-                <th className="text-left px-5 py-3 font-semibold">Email</th>
-                <th className="text-left px-5 py-3 font-semibold">Role</th>
-                <th className="text-left px-5 py-3 font-semibold">Status</th>
-                <th className="text-left px-5 py-3 font-semibold">Devices</th>
-                <th className="text-left px-5 py-3 font-semibold">Last Login</th>
-                <th className="text-right px-5 py-3 font-semibold">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading
-                ? Array(5).fill(0).map((_, i) => <RowSkeleton key={i} cols={7} />)
-                : users.length === 0
-                  ? (
-                    <tr>
-                      <td colSpan={7} className="text-center py-12 text-gray-400 text-sm">No users found</td>
-                    </tr>
-                  )
-                  : users.map((u) => (
-                    <tr key={u._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 bg-[#2E3A8C] rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                            {u.name?.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="font-medium text-[#2E3A8C]">{u.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 text-[#49608c] text-xs">{u.email}</td>
-                      <td className="px-5 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${roleColor[u.role?.name] || 'bg-gray-100 text-gray-600'}`}>
-                          {u.role?.displayName || u.role?.name}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${u.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                          {u.isActive ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className="text-xs text-[#49608c]">
-                          {u.assignedDevices?.length > 0
-                            ? <span className="bg-blue-50 text-[#2E3A8C] px-2 py-0.5 rounded-full border border-blue-100 font-medium">{u.assignedDevices.length} device{u.assignedDevices.length > 1 ? 's' : ''}</span>
-                            : <span className="text-gray-400">None</span>}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 text-xs text-[#49608c]">
-                        {u.lastLogin ? new Date(u.lastLogin).toLocaleDateString() : 'Never'}
-                      </td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            onClick={() => toggleActive(u)}
-                            disabled={toggling[u._id]}
-                            title={u.isActive ? 'Deactivate' : 'Activate'}
-                            className={`p-1.5 rounded-lg transition-colors disabled:opacity-40 ${u.isActive ? 'text-red-400 hover:bg-red-50' : 'text-green-500 hover:bg-green-50'}`}
-                          >
-                            {toggling[u._id]
-                              ? <div className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                              : u.isActive ? <FiX size={15} /> : <FiCheck size={15} />}
-                          </button>
-                          <button onClick={() => openEdit(u)} className="p-1.5 text-[#49608c] hover:text-[#2E3A8C] hover:bg-blue-50 rounded-lg transition-colors" title="Edit user">
-                            <FiEdit2 size={15} />
-                          </button>
-                          {isAdmin && (
-                            <button onClick={() => openDevModal(u)} className="p-1.5 text-[#49608c] hover:text-[#2E3A8C] hover:bg-blue-50 rounded-lg transition-colors" title="Assign devices">
-                              <FiCpu size={15} />
-                            </button>
-                          )}
-                          {isSuperAdmin && (
-                            <button onClick={() => setDeleteTarget(u)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete user">
-                              <FiTrash2 size={15} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-            </tbody>
-          </table>
-        </div>
-
-        {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-            <span className="text-xs text-gray-400">
-              Page {page} of {pagination.totalPages} · {pagination.total} users
-            </span>
-            <div className="flex gap-2">
-              <button disabled={!pagination.hasPrevPage} onClick={() => setPage((p) => p - 1)} className="px-3 py-1 text-xs border rounded-lg disabled:opacity-40 hover:bg-gray-50 bg-white">Prev</button>
-              <button disabled={!pagination.hasNextPage} onClick={() => setPage((p) => p + 1)} className="px-3 py-1 text-xs border rounded-lg disabled:opacity-40 hover:bg-gray-50 bg-white">Next</button>
-            </div>
-          </div>
-        )}
+      <div className="bg-white rounded-xl shadow-sm">
+        <DataTable
+          columns={columns}
+          data={users}
+          progressPending={loading}
+          progressComponent={<LoadingSkeleton />}
+          noDataComponent={<NoDataComponent />}
+          customStyles={tableCustomStyles}
+          responsive
+          pagination
+          paginationServer
+          paginationTotalRows={pagination.total}
+          paginationPerPage={limit}
+          paginationDefaultPage={page}
+          onChangePage={(p) => setPage(p)}
+          paginationComponentOptions={{ noRowsPerPage: true }}
+          highlightOnHover
+          persistTableHead
+        />
       </div>
 
       {/* Create / Edit Modal */}

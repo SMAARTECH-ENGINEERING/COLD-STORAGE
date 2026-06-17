@@ -67,7 +67,7 @@ export default function ProfileScreen({navigation}) {
         <Text style={styles.sectionTitle}>Assigned Devices</Text>
 
         <View style={styles.infoCard}>
-          <Ionicons style={styles.infoIcon} name="hardware-chip-outline" size={20} color="#2563EB" />
+          <Ionicons style={styles.infoIcon} name="hardware-chip-outline" size={20} color="#1E3A8A" />
 
           <Text style={styles.infoText}>
             {profile?.assignedDevices?.length
@@ -113,7 +113,7 @@ function MenuItem({icon, title, onPress}) {
   return (
     <TouchableOpacity style={styles.menuItem} onPress={onPress}>
       <View style={styles.menuLeft}>
-        <Ionicons name={icon} size={22} color="#2563EB" />
+        <Ionicons name={icon} size={22} color="#1E3A8A" />
         <Text style={styles.menuTitle}>{title}</Text>
       </View>
 
@@ -150,7 +150,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: '#2563EB',
+    backgroundColor: '#1E3A8A',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 14,

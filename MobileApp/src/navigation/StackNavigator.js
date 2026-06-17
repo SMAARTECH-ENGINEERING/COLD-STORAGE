@@ -1,19 +1,31 @@
 import React from 'react';
-import { Platform, Pressable } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
-import TabNavigator from './TabNavigator';
-import DeviceDetailScreen from '../screens/DeviceDetailScreen';
-import SensorHistoryScreen from '../screens/SensorHistoryScreen';
-import DeviceStatsScreen from '../screens/DeviceStatsScreen';
-import AlertDetailScreen from '../screens/AlertDetailScreen';
-import ManualReadingScreen from '../screens/ManualReadingScreen';
-import ChangePasswordScreen from '../screens/ChangePasswordScreen';
+import TabNavigator            from './TabNavigator';
+import DeviceDetailScreen      from '../screens/DeviceDetailScreen';
+import SensorHistoryScreen     from '../screens/SensorHistoryScreen';
+import DeviceStatsScreen       from '../screens/DeviceStatsScreen';
+import AlertDetailScreen       from '../screens/AlertDetailScreen';
+import ManualReadingScreen     from '../screens/ManualReadingScreen';
+import ChangePasswordScreen    from '../screens/ChangePasswordScreen';
 import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
-import AppSettingsScreen from '../screens/AppSettingsScreen';
+import AppSettingsScreen       from '../screens/AppSettingsScreen';
 
 const Stack = createNativeStackNavigator();
+
+function HeaderLogo() {
+  return (
+    <View style={styles.headerLogoWrap}>
+      <Image
+        source={require('../assets/logo.png')}
+        style={styles.headerLogoImg}
+        resizeMode="contain"
+      />
+    </View>
+  );
+}
 
 export default function StackNavigator() {
   return (
@@ -22,40 +34,36 @@ export default function StackNavigator() {
         headerShown: true,
         gestureEnabled: true,
         fullScreenGestureEnabled: true,
-        animation:
-          Platform.OS === 'ios' ? 'slide_from_right' : 'fade_from_bottom',
+        animation: Platform.OS === 'ios' ? 'slide_from_right' : 'fade_from_bottom',
         animationDuration: 250,
         headerShadowVisible: false,
         headerStyle: {
-          backgroundColor: '#2563EB',
-          borderBottomWidth: 0,
-          shadowOpacity: 0,
-          elevation: 0,
+          backgroundColor: '#1E3A8A',
         },
         headerTitleAlign: 'left',
         headerTitleStyle: {
-          fontSize: 20,
+          fontSize: 17,
           fontWeight: '700',
           color: '#FFFFFF',
         },
-        headerTitleContainerStyle: {
-          paddingLeft: 16,
-        },
-        headerRightContainerStyle: {
-          paddingRight: 16,
-        },
         headerTintColor: '#FFFFFF',
+        headerLeft: () => (
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={styles.backBtn}
+          >
+            <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+          </Pressable>
+        ),
         headerRight: () => (
           <Pressable
             onPress={() => navigation.navigate('Home', { screen: 'Profile' })}
-            style={{ padding: 8 }}
+            style={styles.profileBtn}
           >
-            <Ionicons name="person-circle-outline" size={28} color="#FFFFFF" />
+            <HeaderLogo />
           </Pressable>
         ),
-        contentStyle: {
-          backgroundColor: '#F8FAFC',
-        },
+        contentStyle: { backgroundColor: '#F8FAFC' },
       })}
     >
       <Stack.Screen
@@ -101,8 +109,22 @@ export default function StackNavigator() {
       <Stack.Screen
         name="AppSettings"
         component={AppSettingsScreen}
-        options={{ title: 'Settings' }}
+        options={{ title: 'App Settings' }}
       />
     </Stack.Navigator>
   );
 }
+
+const styles = StyleSheet.create({
+  backBtn: { marginLeft: Platform.OS === 'ios' ? 0 : -4, padding: 4 },
+  profileBtn: { padding: 4 },
+  headerLogoWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 9,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerLogoImg: { width: 26, height: 26 },
+});

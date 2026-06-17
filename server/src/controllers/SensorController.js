@@ -41,6 +41,20 @@ class SensorController {
     const stats = await sensorService.getTemperatureStats(req.params.deviceId, hours);
     ApiResponse.success(res, `Statistics for last ${hours} hours`, stats);
   });
+
+  exportHistory = asyncHandler(async (req, res) => {
+    const format = req.query.format;
+    const { buffer, device } = await sensorService.exportHistory(req.params.deviceId, req.query, format);
+
+    const contentType = format === 'xlsx'
+      ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      : 'application/pdf';
+    const filename = `${device.deviceId}-history.${format}`;
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(buffer);
+  });
 }
 
 module.exports = new SensorController();

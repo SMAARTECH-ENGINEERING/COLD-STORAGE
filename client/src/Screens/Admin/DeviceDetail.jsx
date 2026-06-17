@@ -7,14 +7,14 @@ import {
 } from 'recharts';
 import {
   FiThermometer, FiDroplet, FiArrowLeft, FiRefreshCw,
-  FiCpu, FiAlertTriangle, FiClock, FiMapPin, FiWind, FiZap,
+  FiCpu, FiAlertTriangle, FiClock, FiMapPin, FiWind, FiZap, FiDownload,
 } from 'react-icons/fi';
 import { MdDoorFront } from 'react-icons/md';
 import { getDevice } from '../../api/devices.api';
-import { getSensorHistory, getSensorStats, getLatestReading } from '../../api/sensors.api';
+import { getSensorHistory, getSensorStats, getLatestReading, exportSensorHistory } from '../../api/sensors.api';
 import { getAlerts } from '../../api/alerts.api';
 import { getData, getList, getErrorMessage } from '../../utils/api.utils';
-import useSocket from '../../hooks/useSocket';
+import useSocket, { emitSocketEvent } from '../../hooks/useSocket';
 
 /* ─── helpers ────────────────────────────────────────────────────────────── */
 const fmtTime = (ts) => {
@@ -162,6 +162,25 @@ const DeviceDetail = () => {
 
   useEffect(() => { load(); }, [load]);
 
+  const handleExport = useCallback(async (format) => {
+    if (!device) return;
+    try {
+      const startDate = new Date(Date.now() - timeRange * 3_600_000).toISOString();
+      const res = await exportSensorHistory(device.deviceId, { format, startDate });
+      const blob = new Blob([res.data]);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${device.deviceId}-history.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(getErrorMessage(err, 'Failed to export report'));
+    }
+  }, [device, timeRange]);
+
   const socketHandlers = useMemo(() => ({
     'sensor:reading': (data) => {
       // data may be the reading directly or wrapped
@@ -192,6 +211,15 @@ const DeviceDetail = () => {
   }), [device, id]);
 
   useSocket(socketHandlers);
+
+  // Join the device-specific socket room so 'sensor:reading'/'device:status' events for
+  // this device actually reach us (server only emits those into `device:<mongoId>`, not
+  // the auto-joined dashboard room).
+  useEffect(() => {
+    if (!device?._id) return;
+    emitSocketEvent('join:device', device._id);
+    return () => emitSocketEvent('leave:device', device._id);
+  }, [device?._id]);
 
   if (loading) return <LoadingSkeleton />;
 
@@ -233,12 +261,26 @@ const DeviceDetail = () => {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => load()}
-          className="flex items-center gap-1.5 text-xs text-[#49608c] border border-gray-200 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <FiRefreshCw size={13} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleExport('xlsx')}
+            className="flex items-center gap-1.5 text-xs text-[#49608c] border border-gray-200 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <FiDownload size={13} /> Excel
+          </button>
+          <button
+            onClick={() => handleExport('pdf')}
+            className="flex items-center gap-1.5 text-xs text-[#49608c] border border-gray-200 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <FiDownload size={13} /> PDF
+          </button>
+          <button
+            onClick={() => load()}
+            className="flex items-center gap-1.5 text-xs text-[#49608c] border border-gray-200 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <FiRefreshCw size={13} /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Live Reading Cards */}

@@ -1,8 +1,42 @@
 {
   "expo": {
-    "name": "Cold Storage Monitor",
-    "slug": "cold-storage-monitor",
-    "version": "1.0.0",
-    "platforms": ["ios", "android", "web"]
+    "name": "SmaaFrost",
+    "slug": "smaafrost",
+    "version": "1.0.1",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "platforms": ["ios", "android"],
+    "icon": "./src/assets/logo.png",
+    "splash": {
+      "image": "./src/assets/splash.png",
+      "backgroundColor": "#FFFFFF",
+      "resizeMode": "cover"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0,
+      "checkAutomatically": "ON_LOAD"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/smaafrostlogo.png",
+        "backgroundColor": "#FFFFFF"
+      },
+      "package": "com.sepl.smaafrost"
+    },
+    "ios": {
+      "bundleIdentifier": "com.sepl.smaafrost",
+      "supportsTablet": false
+    },
+    "plugins": [
+      "expo-secure-store",
+      "expo-updates",
+      [
+        "expo-notifications",
+        {
+          "color": "#1E3A8A",
+          "defaultChannel": "alerts"
+        }
+      ]
+    ]
   }
 }

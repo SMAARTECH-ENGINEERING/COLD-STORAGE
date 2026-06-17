@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
+import DataTable from 'react-data-table-component';
 import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiThermometer, FiDroplet, FiRefreshCw, FiWind, FiZap } from 'react-icons/fi';
 import { MdDoorFront } from 'react-icons/md';
 import Dialog from '@mui/material/Dialog';
@@ -25,14 +26,69 @@ const emptyForm = {
 };
 const DIALOG_PAPER = { sx: { borderRadius: '12px' } };
 
-const RowSkeleton = React.memo(() => (
-  <tr>
-    {Array(7).fill(0).map((_, i) => (
-      <td key={i} className="px-5 py-3"><div className="h-4 bg-gray-100 rounded animate-pulse" /></td>
+const tableCustomStyles = {
+  tableWrapper: {
+    style: {
+      borderRadius: '12px',
+      overflow: 'hidden',
+    },
+  },
+  headRow: {
+    style: {
+      backgroundColor: '#f2f6fc',
+      borderBottomWidth: '0',
+      minHeight: '40px',
+    },
+  },
+  headCells: {
+    style: {
+      color: '#49608c',
+      fontSize: '11px',
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: '0.05em',
+      paddingLeft: '20px',
+      paddingRight: '20px',
+    },
+  },
+  rows: {
+    style: {
+      fontSize: '13px',
+      borderBottomColor: '#f9fafb',
+      minHeight: '52px',
+      '&:hover': { backgroundColor: '#f9fafb' },
+    },
+  },
+  cells: {
+    style: {
+      paddingLeft: '20px',
+      paddingRight: '20px',
+    },
+  },
+  pagination: {
+    style: {
+      borderTopColor: '#f3f4f6',
+      fontSize: '12px',
+      color: '#9ca3af',
+    },
+  },
+};
+
+const LoadingSkeleton = () => (
+  <div className="divide-y divide-gray-50">
+    {Array(5).fill(0).map((_, i) => (
+      <div key={i} className="flex gap-4 px-5 py-3.5">
+        {Array(6).fill(0).map((__, j) => (
+          <div key={j} className="h-4 bg-gray-100 rounded animate-pulse flex-1" />
+        ))}
+      </div>
     ))}
-  </tr>
-));
-RowSkeleton.displayName = 'RowSkeleton';
+  </div>
+);
+
+const NoDataComponent = () => (
+  <div className="py-12 text-center text-gray-400 text-sm">No devices found</div>
+);
 
 const Devices = () => {
   const { isAdmin } = useAuth();
@@ -199,6 +255,119 @@ const Devices = () => {
     }
   };
 
+  const columns = useMemo(() => {
+    const cols = [
+      {
+        name: 'Device',
+        minWidth: '160px',
+        cell: (d) => (
+          <button onClick={() => navigate(`/admin/devices/${d._id}`)} className="text-left group py-1">
+            <div className="font-semibold text-[#2E3A8C] text-sm group-hover:underline">{d.name}</div>
+            <div className="text-xs text-gray-400 font-mono">{d.deviceId}</div>
+          </button>
+        ),
+      },
+      {
+        name: 'Location',
+        minWidth: '120px',
+        cell: (d) => <span className="text-xs text-[#49608c]">{d.location || '—'}</span>,
+      },
+      {
+        name: 'Status',
+        minWidth: '110px',
+        cell: (d) => (
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${statusColor[d.status] || 'bg-gray-100 text-gray-600'}`}>
+            {d.status}
+          </span>
+        ),
+      },
+      {
+        name: 'Latest Reading',
+        minWidth: '200px',
+        grow: 2,
+        cell: (d) => {
+          const r = readings[d.deviceId];
+          if (!r) return <span className="text-xs text-gray-400">No data</span>;
+          return (
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs py-1">
+              <span className="flex items-center gap-1">
+                <FiThermometer size={11} className="text-orange-500" />
+                <span className="font-semibold">{r.temperature?.toFixed(1)}°C</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <FiDroplet size={11} className="text-blue-500" />
+                <span className="font-semibold">{r.humidity?.toFixed(0)}%</span>
+              </span>
+              {r.voc != null && r.voc > 0 && (
+                <span className="flex items-center gap-1">
+                  <FiWind size={11} className="text-purple-500" />
+                  <span className="font-semibold text-purple-700">{r.voc}</span>
+                </span>
+              )}
+              <span className="flex items-center gap-1">
+                <FiZap size={11} className={r.compressor ? 'text-blue-500' : 'text-gray-400'} />
+                <span className={r.compressor ? 'text-blue-600 font-semibold' : 'text-gray-400'}>
+                  {r.compressor ? 'On' : 'Off'}
+                </span>
+              </span>
+              <span className="flex items-center gap-1">
+                <MdDoorFront size={12} className={r.doorStatus === 'open' ? 'text-red-500' : 'text-green-500'} />
+                <span className={r.doorStatus === 'open' ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
+                  {r.doorStatus}
+                </span>
+              </span>
+            </div>
+          );
+        },
+      },
+      {
+        name: 'Vegetable',
+        minWidth: '110px',
+        cell: (d) => (
+          <button
+            onClick={() => isAdmin && openVegModal(d)}
+            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+              d.assignedVegetable
+                ? 'border-green-200 text-green-700 bg-green-50 hover:bg-green-100'
+                : 'border-gray-200 text-gray-400 hover:bg-gray-50'
+            } ${!isAdmin && 'cursor-default pointer-events-none'}`}
+          >
+            {d.assignedVegetable?.name || 'None'}
+          </button>
+        ),
+      },
+      {
+        name: 'Last Seen',
+        minWidth: '140px',
+        cell: (d) => (
+          <span className="text-xs text-[#49608c]">
+            {d.lastSeen ? new Date(d.lastSeen).toLocaleString() : '—'}
+          </span>
+        ),
+      },
+    ];
+
+    if (isAdmin) {
+      cols.push({
+        name: 'Actions',
+        right: true,
+        minWidth: '90px',
+        cell: (d) => (
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => openEdit(d)} className="p-1.5 text-[#49608c] hover:text-[#2E3A8C] hover:bg-blue-50 rounded-lg transition-colors">
+              <FiEdit2 size={15} />
+            </button>
+            <button onClick={() => setDeleteTarget(d)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+              <FiTrash2 size={15} />
+            </button>
+          </div>
+        ),
+      });
+    }
+
+    return cols;
+  }, [isAdmin, navigate, openEdit, openVegModal, readings]);
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
@@ -242,121 +411,25 @@ const Devices = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#f2f6fc] text-[#49608c] text-xs uppercase">
-                <th className="text-left px-5 py-3 font-semibold">Device</th>
-                <th className="text-left px-5 py-3 font-semibold">Location</th>
-                <th className="text-left px-5 py-3 font-semibold">Status</th>
-                <th className="text-left px-5 py-3 font-semibold">Latest Reading</th>
-                <th className="text-left px-5 py-3 font-semibold">Vegetable</th>
-                <th className="text-left px-5 py-3 font-semibold">Last Seen</th>
-                {isAdmin && <th className="text-right px-5 py-3 font-semibold">Actions</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading
-                ? Array(5).fill(0).map((_, i) => <RowSkeleton key={i} />)
-                : devices.length === 0
-                  ? <tr><td colSpan={7} className="text-center py-12 text-gray-400 text-sm">No devices found</td></tr>
-                  : devices.map((d) => {
-                    const r = readings[d.deviceId];
-                    return (
-                      <tr key={d._id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-5 py-3">
-                          <button
-                            onClick={() => navigate(`/admin/devices/${d._id}`)}
-                            className="text-left group"
-                          >
-                            <div className="font-semibold text-[#2E3A8C] text-sm group-hover:underline">{d.name}</div>
-                            <div className="text-xs text-gray-400 font-mono">{d.deviceId}</div>
-                          </button>
-                        </td>
-                        <td className="px-5 py-3 text-xs text-[#49608c]">{d.location || '—'}</td>
-                        <td className="px-5 py-3">
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${statusColor[d.status] || 'bg-gray-100 text-gray-600'}`}>
-                            {d.status}
-                          </span>
-                        </td>
-                        <td className="px-5 py-3">
-                          {r ? (
-                            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">
-                              <span className="flex items-center gap-1">
-                                <FiThermometer size={11} className="text-orange-500" />
-                                <span className="font-semibold">{r.temperature?.toFixed(1)}°C</span>
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <FiDroplet size={11} className="text-blue-500" />
-                                <span className="font-semibold">{r.humidity?.toFixed(0)}%</span>
-                              </span>
-                              {r.voc != null && r.voc > 0 && (
-                                <span className="flex items-center gap-1">
-                                  <FiWind size={11} className="text-purple-500" />
-                                  <span className="font-semibold text-purple-700">{r.voc}</span>
-                                </span>
-                              )}
-                              <span className="flex items-center gap-1">
-                                <FiZap size={11} className={r.compressor ? 'text-blue-500' : 'text-gray-400'} />
-                                <span className={r.compressor ? 'text-blue-600 font-semibold' : 'text-gray-400'}>
-                                  {r.compressor ? 'On' : 'Off'}
-                                </span>
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <MdDoorFront size={12} className={r.doorStatus === 'open' ? 'text-red-500' : 'text-green-500'} />
-                                <span className={r.doorStatus === 'open' ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
-                                  {r.doorStatus}
-                                </span>
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-xs text-gray-400">No data</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3">
-                          <button
-                            onClick={() => isAdmin && openVegModal(d)}
-                            className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                              d.assignedVegetable
-                                ? 'border-green-200 text-green-700 bg-green-50 hover:bg-green-100'
-                                : 'border-gray-200 text-gray-400 hover:bg-gray-50'
-                            } ${!isAdmin && 'cursor-default pointer-events-none'}`}
-                          >
-                            {d.assignedVegetable?.name || 'None'}
-                          </button>
-                        </td>
-                        <td className="px-5 py-3 text-xs text-[#49608c]">
-                          {d.lastSeen ? new Date(d.lastSeen).toLocaleString() : '—'}
-                        </td>
-                        {isAdmin && (
-                          <td className="px-5 py-3">
-                            <div className="flex items-center justify-end gap-1.5">
-                              <button onClick={() => openEdit(d)} className="p-1.5 text-[#49608c] hover:text-[#2E3A8C] hover:bg-blue-50 rounded-lg transition-colors">
-                                <FiEdit2 size={15} />
-                              </button>
-                              <button onClick={() => setDeleteTarget(d)} className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
-                                <FiTrash2 size={15} />
-                              </button>
-                            </div>
-                          </td>
-                        )}
-                      </tr>
-                    );
-                  })}
-            </tbody>
-          </table>
-        </div>
-
-        {pagination.totalPages > 1 && (
-          <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100">
-            <span className="text-xs text-gray-400">Page {page} of {pagination.totalPages} · {pagination.total} devices</span>
-            <div className="flex gap-2">
-              <button disabled={!pagination.hasPrevPage} onClick={() => setPage((p) => p - 1)} className="px-3 py-1 text-xs border rounded-lg disabled:opacity-40 hover:bg-gray-50 bg-white">Prev</button>
-              <button disabled={!pagination.hasNextPage} onClick={() => setPage((p) => p + 1)} className="px-3 py-1 text-xs border rounded-lg disabled:opacity-40 hover:bg-gray-50 bg-white">Next</button>
-            </div>
-          </div>
-        )}
+      <div className="bg-white rounded-xl shadow-sm">
+        <DataTable
+          columns={columns}
+          data={devices}
+          progressPending={loading}
+          progressComponent={<LoadingSkeleton />}
+          noDataComponent={<NoDataComponent />}
+          customStyles={tableCustomStyles}
+          responsive
+          pagination
+          paginationServer
+          paginationTotalRows={pagination.total}
+          paginationPerPage={limit}
+          paginationDefaultPage={page}
+          onChangePage={(p) => setPage(p)}
+          paginationComponentOptions={{ noRowsPerPage: true }}
+          highlightOnHover
+          persistTableHead
+        />
       </div>
 
       {/* Create / Edit Modal */}
