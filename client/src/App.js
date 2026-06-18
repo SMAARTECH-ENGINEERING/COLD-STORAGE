@@ -21,6 +21,7 @@ const StorageUnits       = lazy(() => import('./Screens/Admin/StorageUnits'));
 const StorageUnitDetail  = lazy(() => import('./Screens/Admin/StorageUnitDetail'));
 const Reports      = lazy(() => import('./Screens/Admin/Reports'));
 const DeviceDetail = lazy(() => import('./Screens/Admin/DeviceDetail'));
+const AuditLogs    = lazy(() => import('./Screens/Admin/AuditLogs'));
 const NotFound     = lazy(() => import('./Screens/404'));
 
 const PageLoader = () => (
@@ -39,6 +40,7 @@ const userRoutes = [
   { path: '/admin/storage-units',     component: <StorageUnits /> },
   { path: '/admin/storage-units/:id', component: <StorageUnitDetail /> },
   { path: '/admin/users',          component: <Users /> },
+  { path: '/admin/audit-logs',     component: <AuditLogs /> },
   { path: '/admin/profile',    component: <Profile /> },
   { path: '/admin/settings',      component: <Settings /> },
   { path: '/admin/reports',       component: <Reports /> },

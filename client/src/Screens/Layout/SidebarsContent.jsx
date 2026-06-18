@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BiSolidDashboard } from 'react-icons/bi';
-import { FiUsers, FiCpu, FiBell, FiUser, FiSettings, FiBarChart2, FiBox } from 'react-icons/fi';
+import { FiUsers, FiCpu, FiBell, FiUser, FiSettings, FiBarChart2, FiBox, FiFileText } from 'react-icons/fi';
 import { MdOutlineEco } from 'react-icons/md';
 import { useAuth } from '../../context/AuthContext';
 
@@ -50,6 +50,12 @@ const SidebarsContent = () => {
       path: '/admin/users',
       label: 'Users',
       icon: <FiUsers size={20} />,
+      show: isAdmin,
+    },
+    {
+      path: '/admin/audit-logs',
+      label: 'Audit Logs',
+      icon: <FiFileText size={20} />,
       show: isAdmin,
     },
     {

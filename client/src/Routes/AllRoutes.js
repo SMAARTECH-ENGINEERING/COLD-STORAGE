@@ -8,6 +8,7 @@ import StorageUnits from '../Screens/Admin/StorageUnits';
 import Alerts from '../Screens/Admin/Alerts';
 import Profile from '../Screens/Admin/Profile';
 import Settings from '../Screens/Admin/Settings';
+import AuditLogs from '../Screens/Admin/AuditLogs';
 import Login from '../Screens/Auth/Login';
 import NotFound from '../Screens/404';
 
@@ -18,6 +19,7 @@ const userRoutes = [
   { path: '/admin/vegetables', component: <Vegetables /> },
   { path: '/admin/storage-units', component: <StorageUnits /> },
   { path: '/admin/users', component: <Users /> },
+  { path: '/admin/audit-logs', component: <AuditLogs /> },
   { path: '/admin/profile', component: <Profile /> },
   { path: '/admin/settings', component: <Settings /> },
   { path: '/admin/', exact: true, component: <Navigate to="/admin/dashboard" replace /> },
