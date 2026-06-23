@@ -42,7 +42,7 @@ const Navbar = React.memo(({ toggleSidebar }) => {
   const goAlerts = useCallback(() => navigate('/admin/alerts'), [navigate]);
 
   return (
-    <div className="w-full h-16 bg-white/90 backdrop-blur-sm flex flex-row items-center rounded-xl shadow-card sticky top-4 z-40 px-4">
+    <div className="w-full h-16 bg-white/90 backdrop-blur-sm flex flex-row items-center   shadow-card sticky top-4 z-40 px-4">
       <button
         onClick={toggleSidebar}
         className="text-ink hover:text-brand-600 hover:bg-brand-50 transition-colors p-2 rounded-lg"
