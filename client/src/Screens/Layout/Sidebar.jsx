@@ -12,7 +12,7 @@ const Sidebar = React.memo(({ isOpen, toggleSidebar }) => {
 
   return (
     <div
-      className={`scroll-container overflow-y-auto left-0 w-64 bg-white shadow fixed inset-y-0 transform transition-transform duration-300 ease-in-out ${
+      className={`scroll-container overflow-y-auto left-0 w-64 bg-white shadow-card fixed inset-y-0 transform transition-transform duration-300 ease-in-out ${
         isOpen ? 'translate-x-0' : '-translate-x-full'
       } flex flex-col`}
       style={SIDEBAR_STYLE}
@@ -23,13 +23,14 @@ const Sidebar = React.memo(({ isOpen, toggleSidebar }) => {
           <div className="flex items-center gap-2">
             <img src={logo} alt="Smaafrost" className="h-9 w-auto object-contain" />
             <div>
-              <div className="text-sm font-bold text-[#2E3A8C] leading-tight">Smaafrost</div>
+              <div className="text-sm font-bold text-brand-600 leading-tight">Smaafrost</div>
               <div className="text-[10px] text-gray-400 leading-tight">Monitor</div>
             </div>
           </div>
           <button
             onClick={toggleSidebar}
-            className="text-gray-400 hover:text-[#2E3A8C] transition-colors"
+            className="text-gray-400 hover:text-brand-600 hover:bg-brand-50 rounded-lg p-1 transition-colors"
+            aria-label="Close sidebar"
           >
             <AiOutlineClose size={20} />
           </button>
@@ -45,11 +46,11 @@ const Sidebar = React.memo(({ isOpen, toggleSidebar }) => {
       {user && (
         <div className="px-4 py-3 border-t border-gray-100">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-[#2E3A8C] rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+            <div className="w-8 h-8 bg-brand-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
               {user.name?.charAt(0).toUpperCase()}
             </div>
             <div className="overflow-hidden">
-              <div className="text-xs font-semibold text-[#2E3A8C] truncate">{user.name}</div>
+              <div className="text-xs font-semibold text-brand-600 truncate">{user.name}</div>
               <div className="text-[10px] text-gray-400 truncate capitalize">
                 {user.role?.displayName || user.role?.name}
               </div>

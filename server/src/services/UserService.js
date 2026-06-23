@@ -1,6 +1,7 @@
 const userRepository = require('../repositories/UserRepository');
 const roleRepository = require('../repositories/RoleRepository');
 const deviceRepository = require('../repositories/DeviceRepository');
+const storageUnitRepository = require('../repositories/StorageUnitRepository');
 const DeviceAssignment = require('../models/DeviceAssignment');
 const ApiError = require('../utils/ApiError');
 const { getPaginationParams, getSortParams, getSearchFilter } = require('../utils/pagination');
@@ -37,7 +38,11 @@ class UserService {
   async getUserById(id) {
     const user = await userRepository.findOne(
       { _id: id },
-      [{ path: 'role', select: 'name displayName permissions' }, { path: 'assignedDevices', select: 'deviceId name location status' }]
+      [
+        { path: 'role', select: 'name displayName permissions' },
+        { path: 'assignedDevices', select: 'deviceId name location status' },
+        { path: 'assignedStorageUnits', select: 'unitId name location' },
+      ]
     );
     if (!user) throw ApiError.notFound('User not found');
     return user;
@@ -115,6 +120,35 @@ class UserService {
     );
 
     return userRepository.findOne({ _id: userId }, [{ path: 'assignedDevices', select: 'deviceId name location status' }]);
+  }
+
+  async assignStorageUnits(userId, storageUnitIds) {
+    const user = await userRepository.findById(userId);
+    if (!user) throw ApiError.notFound('User not found');
+
+    const units = await storageUnitRepository.find({ _id: { $in: storageUnitIds }, isActive: true });
+    if (units.length !== storageUnitIds.length) {
+      throw ApiError.badRequest('One or more storage unit IDs are invalid or inactive');
+    }
+
+    await userRepository.model.findByIdAndUpdate(
+      userId,
+      { $addToSet: { assignedStorageUnits: { $each: storageUnitIds } } }
+    );
+
+    return userRepository.findOne({ _id: userId }, [{ path: 'assignedStorageUnits', select: 'unitId name location' }]);
+  }
+
+  async removeStorageUnits(userId, storageUnitIds) {
+    const user = await userRepository.findById(userId);
+    if (!user) throw ApiError.notFound('User not found');
+
+    await userRepository.model.findByIdAndUpdate(
+      userId,
+      { $pull: { assignedStorageUnits: { $in: storageUnitIds } } }
+    );
+
+    return userRepository.findOne({ _id: userId }, [{ path: 'assignedStorageUnits', select: 'unitId name location' }]);
   }
 }
 

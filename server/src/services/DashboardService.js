@@ -62,6 +62,7 @@ class DashboardService {
     return devices.map((device) => {
       const stat = statsMap[device.deviceId] || null;
       return {
+        _id: device._id,
         deviceId: device.deviceId,
         name: device.name,
         location: device.location,

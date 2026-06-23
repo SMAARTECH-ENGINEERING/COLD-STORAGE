@@ -17,6 +17,7 @@ const userSchema = new mongoose.Schema({
   isActive: { type: Boolean, default: true },
   phone: { type: String, trim: true },
   assignedDevices: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Device' }],
+  assignedStorageUnits: [{ type: mongoose.Schema.Types.ObjectId, ref: 'StorageUnit' }],
   lastLogin: { type: Date },
   passwordChangedAt: { type: Date },
 }, { timestamps: true });

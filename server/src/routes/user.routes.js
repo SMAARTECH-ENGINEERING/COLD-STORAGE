@@ -2,10 +2,10 @@ const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/UserController');
 const { authenticate } = require('../middleware/auth');
-const { adminAndAbove, requirePermission } = require('../middleware/rbac');
+const { requirePermission } = require('../middleware/rbac');
 const validate = require('../middleware/validate');
 const auditLog = require('../middleware/auditLogger');
-const { createUserSchema, updateUserSchema, assignDevicesSchema } = require('../validators/user.validator');
+const { createUserSchema, updateUserSchema, assignDevicesSchema, assignStorageUnitsSchema } = require('../validators/user.validator');
 
 /**
  * @swagger
@@ -37,7 +37,8 @@ router.route('/')
    *         schema: { type: string }
    *       - in: query
    *         name: role
-   *         schema: { type: string, enum: [super_admin, admin, operator, viewer] }
+   *         schema: { type: string }
+   *         description: Filter by role name (dynamic — see GET /roles)
    *       - in: query
    *         name: isActive
    *         schema: { type: boolean }
@@ -52,16 +53,18 @@ router.route('/')
    *     security:
    *       - BearerAuth: []
    */
-  .post(adminAndAbove, validate(createUserSchema), auditLog('CREATE', 'users'), userController.createUser);
+  .post(requirePermission('users', 'create'), validate(createUserSchema), auditLog('CREATE', 'users'), userController.createUser);
 
 router.route('/:id')
   .get(requirePermission('users', 'read'), userController.getUserById)
-  .put(adminAndAbove, validate(updateUserSchema), auditLog('UPDATE', 'users'), userController.updateUser)
-  .delete(adminAndAbove, auditLog('DELETE', 'users'), userController.deleteUser);
+  .put(requirePermission('users', 'update'), validate(updateUserSchema), auditLog('UPDATE', 'users'), userController.updateUser)
+  .delete(requirePermission('users', 'delete'), auditLog('DELETE', 'users'), userController.deleteUser);
 
-router.patch('/:id/activate', adminAndAbove, auditLog('ACTIVATE', 'users'), userController.activateUser);
-router.patch('/:id/deactivate', adminAndAbove, auditLog('DEACTIVATE', 'users'), userController.deactivateUser);
-router.post('/:id/devices', adminAndAbove, validate(assignDevicesSchema), auditLog('ASSIGN_DEVICES', 'users'), userController.assignDevices);
-router.delete('/:id/devices', adminAndAbove, validate(assignDevicesSchema), auditLog('REMOVE_DEVICES', 'users'), userController.removeDevices);
+router.patch('/:id/activate', requirePermission('users', 'update'), auditLog('ACTIVATE', 'users'), userController.activateUser);
+router.patch('/:id/deactivate', requirePermission('users', 'update'), auditLog('DEACTIVATE', 'users'), userController.deactivateUser);
+router.post('/:id/devices', requirePermission('users', 'update'), validate(assignDevicesSchema), auditLog('ASSIGN_DEVICES', 'users'), userController.assignDevices);
+router.delete('/:id/devices', requirePermission('users', 'update'), validate(assignDevicesSchema), auditLog('REMOVE_DEVICES', 'users'), userController.removeDevices);
+router.post('/:id/storage-units', requirePermission('users', 'update'), validate(assignStorageUnitsSchema), auditLog('ASSIGN_STORAGE_UNITS', 'users'), userController.assignStorageUnits);
+router.delete('/:id/storage-units', requirePermission('users', 'update'), validate(assignStorageUnitsSchema), auditLog('REMOVE_STORAGE_UNITS', 'users'), userController.removeStorageUnits);
 
 module.exports = router;

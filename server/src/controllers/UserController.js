@@ -47,6 +47,16 @@ class UserController {
     const user = await userService.removeDevices(req.params.id, req.body.deviceIds);
     ApiResponse.success(res, 'Devices removed successfully', user);
   });
+
+  assignStorageUnits = asyncHandler(async (req, res) => {
+    const user = await userService.assignStorageUnits(req.params.id, req.body.storageUnitIds);
+    ApiResponse.success(res, 'Storage units assigned successfully', user);
+  });
+
+  removeStorageUnits = asyncHandler(async (req, res) => {
+    const user = await userService.removeStorageUnits(req.params.id, req.body.storageUnitIds);
+    ApiResponse.success(res, 'Storage units removed successfully', user);
+  });
 }
 
 module.exports = new UserController();

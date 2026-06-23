@@ -2,8 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+html {
+    scroll-behavior: smooth;
+}
+
 body {
     font-family: 'Nunito Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+    background-color: #c3cbed;
+    color: #1c2456;
+}
+
+/* Consistent, visible focus ring for keyboard navigation across the app —
+   only shown for keyboard focus so mouse interactions stay clean. */
+:focus-visible {
+    outline: 2px solid #2e3a8c;
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+.skeleton-shimmer {
+    background: linear-gradient(90deg, #f1f3fb 0%, #e1e5f6 40%, #f1f3fb 80%);
+    background-size: 800px 100%;
 }
 
 * {

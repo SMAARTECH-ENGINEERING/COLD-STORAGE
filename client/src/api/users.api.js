@@ -26,3 +26,9 @@ export const assignDevices = (id, deviceIds) =>
 
 export const removeDevices = (id, deviceIds) =>
   api.delete(`/users/${id}/devices`, { data: { deviceIds } });
+
+export const assignStorageUnits = (id, storageUnitIds) =>
+  api.post(`/users/${id}/storage-units`, { storageUnitIds });
+ 
+export const removeStorageUnits = (id, storageUnitIds) =>
+  api.delete(`/users/${id}/storage-units`, { data: { storageUnitIds } });

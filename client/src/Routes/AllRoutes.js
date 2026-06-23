@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import Dashboard from '../Screens/Admin/Dashboard';
 import Users from '../Screens/Admin/Users';
+import Roles from '../Screens/Admin/Roles';
 import Devices from '../Screens/Admin/Devices';
 import Vegetables from '../Screens/Admin/Vegetables';
 import StorageUnits from '../Screens/Admin/StorageUnits';
@@ -19,6 +20,7 @@ const userRoutes = [
   { path: '/admin/vegetables', component: <Vegetables /> },
   { path: '/admin/storage-units', component: <StorageUnits /> },
   { path: '/admin/users', component: <Users /> },
+  { path: '/admin/roles', component: <Roles /> },
   { path: '/admin/audit-logs', component: <AuditLogs /> },
   { path: '/admin/profile', component: <Profile /> },
   { path: '/admin/settings', component: <Settings /> },

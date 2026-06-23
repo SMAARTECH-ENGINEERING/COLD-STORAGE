@@ -1,6 +1,7 @@
 const deviceRepository = require('../repositories/DeviceRepository');
 const vegetableRepository = require('../repositories/VegetableRepository');
 const userRepository = require('../repositories/UserRepository');
+const storageUnitRepository = require('../repositories/StorageUnitRepository');
 const ApiError = require('../utils/ApiError');
 const { getPaginationParams, getSortParams, getSearchFilter } = require('../utils/pagination');
 
@@ -72,13 +73,26 @@ class DeviceService {
     const vegetable = await vegetableRepository.findById(vegetableId);
     if (!vegetable) throw ApiError.notFound('Vegetable not found');
 
-    return deviceRepository.assignVegetable(deviceId, vegetableId);
+    const updated = await deviceRepository.assignVegetable(deviceId, vegetableId);
+    // The storage unit represents the physical space this device monitors,
+    // so its vegetable follows whatever is assigned to the device(s) inside it.
+    await storageUnitRepository.model.updateMany(
+      { assignedDevices: deviceId },
+      { assignedVegetable: vegetableId }
+    );
+    return updated;
   }
 
   async removeVegetable(deviceId) {
     const device = await deviceRepository.findById(deviceId);
     if (!device) throw ApiError.notFound('Device not found');
-    return deviceRepository.updateById(deviceId, { assignedVegetable: null });
+
+    const updated = await deviceRepository.updateById(deviceId, { assignedVegetable: null });
+    await storageUnitRepository.model.updateMany(
+      { assignedDevices: deviceId },
+      { assignedVegetable: null }
+    );
+    return updated;
   }
 }
 

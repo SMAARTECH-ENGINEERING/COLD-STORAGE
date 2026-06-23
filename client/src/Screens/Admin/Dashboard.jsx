@@ -1,25 +1,29 @@
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
-import { FiCpu, FiBell, FiUsers, FiThermometer, FiDroplet, FiAlertTriangle, FiRefreshCw } from 'react-icons/fi';
+import { FiCpu, FiBell, FiUsers, FiThermometer, FiDroplet, FiAlertTriangle, FiRefreshCw, FiChevronRight } from 'react-icons/fi';
 import { MdOutlineSensors } from 'react-icons/md';
 import { getSummary, getDeviceHealth } from '../../api/dashboard.api';
 import { getAlerts, acknowledgeAlert } from '../../api/alerts.api';
 import { getData, getList, getErrorMessage } from '../../utils/api.utils';
 import { useAuth } from '../../context/AuthContext';
 import useSocket from '../../hooks/useSocket';
+import Card from '../../Components/ui/Card';
+import Badge from '../../Components/ui/Badge';
+import Skeleton from '../../Components/ui/Skeleton';
+import EmptyState from '../../Components/ui/EmptyState';
 
 /* ─── lookup maps (module-level constants) ───────────────────────────────── */
-const statusColor = {
-  online:      'bg-green-100 text-green-700',
-  offline:     'bg-red-100 text-red-700',
-  maintenance: 'bg-yellow-100 text-yellow-700',
-};
-const severityColor = {
-  low:      'bg-blue-100 text-blue-700',
-  medium:   'bg-yellow-100 text-yellow-700',
-  high:     'bg-orange-100 text-orange-700',
-  critical: 'bg-red-100 text-red-700',
+const statusTone = { online: 'success', offline: 'danger', maintenance: 'warning' };
+const statusDot = { online: 'bg-success-500', offline: 'bg-danger-500', maintenance: 'bg-warning-500' };
+const severityTone = { low: 'info', medium: 'warning', high: 'warning', critical: 'danger' };
+// Tailwind's content scanner needs literal class names — `bg-${tone}-50` would
+// never be generated, so the icon-tile backgrounds are mapped explicitly.
+const toneBg = {
+  brand: 'bg-brand-50',
+  success: 'bg-success-50',
+  danger: 'bg-danger-50',
+  purple: 'bg-purple-50',
 };
 const alertTypeLabel = {
   temperature_high: 'Temp High', temperature_low: 'Temp Low',
@@ -28,56 +32,60 @@ const alertTypeLabel = {
 };
 
 /* ─── memoized sub-components ────────────────────────────────────────────── */
-const StatCard = React.memo(({ icon, label, value, sub, color, onClick }) => (
-  <div
+const StatCard = React.memo(({ icon, label, value, sub, tone, onClick, delay = 0 }) => (
+  <Card
+    interactive={Boolean(onClick)}
     onClick={onClick}
-    className={`bg-white rounded-xl p-5 shadow-sm flex items-center gap-4 hover:shadow-md transition-all ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-[#2E3A8C]/20 active:scale-[0.98]' : ''}`}
+    aria-label={onClick ? `${label}: view details` : undefined}
+    className="p-5 flex items-center gap-4 animate-slide-up"
+    style={{ animationDelay: `${delay}ms` }}
   >
-    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${color}`}>
+    <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${toneBg[tone] || 'bg-gray-50'}`}>
       {icon}
     </div>
-    <div className="min-w-0">
-      <div className="text-2xl font-bold text-[#2E3A8C]">
+    <div className="min-w-0 flex-1">
+      <div className="text-2xl font-bold text-brand-600 tabular-nums">
         {value !== undefined && value !== null ? value : <span className="text-gray-300 text-xl">—</span>}
       </div>
-      <div className="text-sm text-[#49608c] truncate">{label}</div>
+      <div className="text-sm text-ink truncate">{label}</div>
       {sub && <div className="text-xs text-gray-400 mt-0.5 truncate">{sub}</div>}
     </div>
-  </div>
+    {onClick && <FiChevronRight className="text-gray-300 flex-shrink-0" size={16} />}
+  </Card>
 ));
 StatCard.displayName = 'StatCard';
 
 const DeviceSkeleton = React.memo(() => (
-  <div className="border border-gray-100 rounded-lg p-4 animate-pulse">
-    <div className="flex justify-between mb-2">
-      <div className="h-4 bg-gray-100 rounded w-32" />
-      <div className="h-4 bg-gray-100 rounded w-16" />
+  <div className="border border-gray-100 rounded-lg p-4">
+    <div className="flex justify-between mb-3">
+      <Skeleton className="h-4 w-32" />
+      <Skeleton className="h-4 w-16" />
     </div>
-    <div className="grid grid-cols-3 gap-2 mt-2">
-      {[1,2,3].map(i => <div key={i} className="h-3 bg-gray-100 rounded w-16" />)}
+    <div className="grid grid-cols-3 gap-2">
+      {[1, 2, 3].map((i) => <Skeleton key={i} className="h-3 w-16" />)}
     </div>
   </div>
 ));
 DeviceSkeleton.displayName = 'DeviceSkeleton';
 
 const StatCardSkeleton = React.memo(() => (
-  <div className="bg-white rounded-xl p-5 shadow-sm animate-pulse">
+  <Card className="p-5">
     <div className="flex items-center gap-4">
-      <div className="w-12 h-12 bg-gray-100 rounded-xl" />
-      <div className="space-y-2">
-        <div className="h-6 w-12 bg-gray-100 rounded" />
-        <div className="h-3 w-20 bg-gray-100 rounded" />
+      <Skeleton className="w-12 h-12 rounded-xl" />
+      <div className="space-y-2 flex-1">
+        <Skeleton className="h-6 w-12" />
+        <Skeleton className="h-3 w-20" />
       </div>
     </div>
-  </div>
+  </Card>
 ));
 StatCardSkeleton.displayName = 'StatCardSkeleton';
 
 const AlertSkeleton = React.memo(() => (
-  <div className="border border-gray-100 rounded-lg p-3 animate-pulse">
-    <div className="h-3 bg-gray-100 rounded w-16 mb-2" />
-    <div className="h-3 bg-gray-100 rounded w-full mb-1" />
-    <div className="h-3 bg-gray-100 rounded w-20" />
+  <div className="border border-gray-100 rounded-lg p-3 space-y-2">
+    <Skeleton className="h-3 w-16" />
+    <Skeleton className="h-3 w-full" />
+    <Skeleton className="h-3 w-20" />
   </div>
 ));
 AlertSkeleton.displayName = 'AlertSkeleton';
@@ -127,7 +135,8 @@ const Dashboard = () => {
 
   useSocket(socketHandlers);
 
-  const handleAcknowledge = useCallback(async (alertId) => {
+  const handleAcknowledge = useCallback(async (e, alertId) => {
+    e.stopPropagation();
     try {
       await acknowledgeAlert(alertId);
       toast.success('Alert acknowledged');
@@ -139,27 +148,27 @@ const Dashboard = () => {
 
   const stats = useMemo(() => [
     {
-      icon:  <FiCpu size={22} className="text-[#2E3A8C]" />,
+      icon:  <FiCpu size={22} className="text-brand-600" />,
       label: 'Total Devices',
       value: summary?.devices?.total,
       sub:   `${summary?.devices?.online ?? 0} online`,
-      color: 'bg-blue-50',
+      tone:  'brand',
       onClick: () => navigate('/admin/devices'),
     },
     {
-      icon:  <MdOutlineSensors size={22} className="text-green-600" />,
+      icon:  <MdOutlineSensors size={22} className="text-success-600" />,
       label: 'Online',
       value: summary?.devices?.online,
       sub:   `${summary?.devices?.offline ?? 0} offline`,
-      color: 'bg-green-50',
+      tone:  'success',
       onClick: () => navigate('/admin/devices'),
     },
     {
-      icon:  <FiBell size={22} className="text-red-500" />,
+      icon:  <FiBell size={22} className="text-danger-500" />,
       label: 'Active Alerts',
       value: summary?.alerts?.active,
       sub:   'requires attention',
-      color: 'bg-red-50',
+      tone:  'danger',
       onClick: () => navigate('/admin/alerts'),
     },
     ...(isAdmin
@@ -168,28 +177,30 @@ const Dashboard = () => {
           label: 'Total Users',
           value: summary?.users?.total,
           sub:   `${summary?.users?.active ?? 0} active`,
-          color: 'bg-purple-50',
+          tone:  'purple',
           onClick: () => navigate('/admin/users'),
         }]
       : []),
   ], [summary, isAdmin, navigate]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-[#2E3A8C]">Dashboard</h1>
-          {lastUpdated && (
-            <p className="text-xs text-gray-400 mt-0.5">
-              Updated {lastUpdated.toLocaleTimeString()}
-            </p>
-          )}
+          <h1 className="text-2xl font-bold text-brand-600 tracking-tight">Dashboard</h1>
+          <p className="text-sm text-gray-400 mt-0.5 flex items-center gap-1.5">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-success-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-success-500" />
+            </span>
+            {lastUpdated ? `Live · updated ${lastUpdated.toLocaleTimeString()}` : 'Connecting…'}
+          </p>
         </div>
         <button
           onClick={() => load()}
           disabled={loading}
-          className="flex items-center gap-1.5 text-xs text-[#49608c] hover:text-[#2E3A8C] border border-gray-200 bg-white px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50"
+          className="flex items-center gap-1.5 text-xs font-medium text-ink hover:text-brand-600 border border-gray-200 bg-white px-3.5 py-2 rounded-lg hover:bg-gray-50 hover:shadow-soft transition-all disabled:opacity-50"
         >
           <FiRefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
         </button>
@@ -199,56 +210,62 @@ const Dashboard = () => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {loading
           ? Array(4).fill(0).map((_, i) => <StatCardSkeleton key={i} />)
-          : stats.map((s) => <StatCard key={s.label} {...s} onClick={s.onClick} />)}
+          : stats.map((s, i) => <StatCard key={s.label} {...s} delay={i * 60} />)}
       </div>
 
       {/* Main content */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Device Health */}
-        <div className="xl:col-span-2 bg-white rounded-xl shadow-sm p-5">
+        <Card className="xl:col-span-2 p-5 animate-slide-up" style={{ animationDelay: '120ms' }}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-[#2E3A8C]">Device Health</h2>
-            <button onClick={() => navigate('/admin/devices')} className="text-xs text-[#2E3A8C] hover:underline">
-              View all →
+            <h2 className="font-semibold text-brand-600">Device Health</h2>
+            <button
+              onClick={() => navigate('/admin/devices')}
+              className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1 group"
+            >
+              View all <FiChevronRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
             </button>
           </div>
 
           {loading ? (
             <div className="space-y-3">{Array(3).fill(0).map((_, i) => <DeviceSkeleton key={i} />)}</div>
           ) : devices.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 text-sm">No device data available</div>
+            <EmptyState icon={<FiCpu size={28} />} title="No device data available" />
           ) : (
             <div className="space-y-3">
               {devices.map((d) => (
-                <div key={d.deviceId} className="border border-gray-100 rounded-lg p-4 hover:border-[#2E3A8C]/30 transition-colors">
+                <button
+                  key={d.deviceId}
+                  onClick={() => d._id && navigate(`/admin/devices/${d._id}`)}
+                  className="w-full text-left border border-gray-100 rounded-lg p-4 hover:border-brand-200 hover:shadow-soft hover:bg-brand-50/30 transition-all focus-visible:shadow-focus"
+                >
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-sm text-[#2E3A8C]">{d.name}</span>
-                      <span className="text-xs text-gray-400 font-mono">{d.deviceId}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-2 h-2 rounded-full flex-shrink-0 ${statusDot[d.status] || 'bg-gray-300'}`} />
+                      <span className="font-semibold text-sm text-brand-600 truncate">{d.name}</span>
+                      <span className="text-xs text-gray-400 font-mono flex-shrink-0">{d.deviceId}</span>
                     </div>
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${statusColor[d.status] || 'bg-gray-100 text-gray-600'}`}>
-                      {d.status}
-                    </span>
+                    <Badge tone={statusTone[d.status]}>{d.status}</Badge>
                   </div>
 
                   {d.stats ? (
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
                       <div className="flex items-center gap-1.5 text-xs">
                         <FiThermometer size={12} className="text-orange-500 flex-shrink-0" />
-                        <span className="text-[#49608c]">
-                          avg <span className="font-semibold text-[#2E3A8C]">{d.stats.avgTemp?.toFixed(1)}°C</span>
+                        <span className="text-ink">
+                          avg <span className="font-semibold text-brand-600">{d.stats.avgTemp?.toFixed(1)}°C</span>
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs">
                         <FiThermometer size={12} className="text-red-400 flex-shrink-0" />
-                        <span className="text-[#49608c]">
+                        <span className="text-ink">
                           max <span className="font-semibold text-red-600">{d.stats.maxTemp?.toFixed(1)}°C</span>
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 text-xs">
                         <FiDroplet size={12} className="text-blue-500 flex-shrink-0" />
-                        <span className="text-[#49608c]">
-                          avg <span className="font-semibold text-[#2E3A8C]">{d.stats.avgHumidity?.toFixed(0)}%</span>
+                        <span className="text-ink">
+                          avg <span className="font-semibold text-brand-600">{d.stats.avgHumidity?.toFixed(0)}%</span>
                         </span>
                       </div>
                       <div className="text-xs text-gray-400">
@@ -261,9 +278,7 @@ const Dashboard = () => {
 
                   {d.assignedVegetable && (
                     <div className="mt-2 flex items-center gap-2">
-                      <span className="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full border border-green-100">
-                        {d.assignedVegetable.name}
-                      </span>
+                      <Badge tone="success">{d.assignedVegetable.name}</Badge>
                       {d.assignedVegetable.temperature && (
                         <span className="text-xs text-gray-400">
                           Target: {d.assignedVegetable.temperature.min}–{d.assignedVegetable.temperature.max}°C
@@ -271,18 +286,21 @@ const Dashboard = () => {
                       )}
                     </div>
                   )}
-                </div>
+                </button>
               ))}
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Active Alerts */}
-        <div className="bg-white rounded-xl shadow-sm p-5">
+        <Card className="p-5 animate-slide-up" style={{ animationDelay: '160ms' }}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-[#2E3A8C]">Active Alerts</h2>
-            <button onClick={() => navigate('/admin/alerts')} className="text-xs text-[#2E3A8C] hover:underline">
-              View all →
+            <h2 className="font-semibold text-brand-600">Active Alerts</h2>
+            <button
+              onClick={() => navigate('/admin/alerts')}
+              className="text-xs font-medium text-brand-600 hover:text-brand-700 flex items-center gap-1 group"
+            >
+              View all <FiChevronRight size={13} className="group-hover:translate-x-0.5 transition-transform" />
             </button>
           </div>
 
@@ -291,39 +309,38 @@ const Dashboard = () => {
               {Array(3).fill(0).map((_, i) => <AlertSkeleton key={i} />)}
             </div>
           ) : alerts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-gray-400 gap-2">
-              <FiAlertTriangle size={28} className="text-gray-300" />
-              <span className="text-sm">No active alerts</span>
-            </div>
+            <EmptyState icon={<FiAlertTriangle size={28} />} title="No active alerts" description="You're all caught up." />
           ) : (
             <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
               {alerts.map((alert) => (
-                <div key={alert._id} className="border border-gray-100 rounded-lg p-3 hover:border-orange-200 transition-colors">
+                <button
+                  key={alert._id}
+                  onClick={() => navigate('/admin/alerts')}
+                  className="w-full text-left border border-gray-100 rounded-lg p-3 hover:border-orange-200 hover:shadow-soft transition-all focus-visible:shadow-focus"
+                >
                   <div className="flex items-center gap-1.5 mb-1">
-                    <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${severityColor[alert.severity]}`}>
-                      {alert.severity}
-                    </span>
+                    <Badge tone={severityTone[alert.severity]} className="px-1.5">{alert.severity}</Badge>
                     <span className="text-xs text-gray-400">
                       {alertTypeLabel[alert.alertType] || alert.alertType}
                     </span>
                   </div>
-                  <p className="text-xs text-[#49608c] line-clamp-2">{alert.message}</p>
+                  <p className="text-xs text-ink line-clamp-2">{alert.message}</p>
                   <div className="flex items-center justify-between mt-1.5">
                     <span className="text-xs text-gray-400 font-mono">{alert.deviceId}</span>
                     {alert.status === 'active' && (
-                      <button
-                        onClick={() => handleAcknowledge(alert._id)}
-                        className="text-xs text-[#2E3A8C] hover:underline font-medium"
+                      <span
+                        onClick={(e) => handleAcknowledge(e, alert._id)}
+                        className="text-xs text-brand-600 hover:text-brand-700 hover:underline font-medium"
                       >
                         Ack
-                      </button>
+                      </span>
                     )}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
-        </div>
+        </Card>
       </div>
     </div>
   );

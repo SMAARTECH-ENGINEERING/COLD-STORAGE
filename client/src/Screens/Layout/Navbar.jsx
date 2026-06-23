@@ -42,25 +42,28 @@ const Navbar = React.memo(({ toggleSidebar }) => {
   const goAlerts = useCallback(() => navigate('/admin/alerts'), [navigate]);
 
   return (
-    <div className="w-full h-16 bg-white flex flex-row items-center shadow-sm  sticky top-4 z-40 px-4">
+    <div className="w-full h-16 bg-white/90 backdrop-blur-sm flex flex-row items-center rounded-xl shadow-card sticky top-4 z-40 px-4">
       <button
         onClick={toggleSidebar}
-        className="text-[#49608c] hover:text-[#2E3A8C] transition-colors p-1"
+        className="text-ink hover:text-brand-600 hover:bg-brand-50 transition-colors p-2 rounded-lg"
         aria-label="Toggle sidebar"
       >
         <AiOutlineMenuUnfold size={22} />
       </button>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-2">
         <button
           onClick={goAlerts}
-          className="relative text-[#49608c] hover:text-[#2E3A8C] transition-colors p-1"
+          className="relative text-ink hover:text-brand-600 hover:bg-brand-50 transition-colors p-2 rounded-lg"
           aria-label={`${activeAlertCount} active alerts`}
         >
           <FiBell size={22} />
           {activeAlertCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[16px] h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
-              {activeAlertCount > 99 ? '99+' : activeAlertCount}
+            <span className="absolute top-0.5 right-0.5 flex">
+              <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-danger-400 opacity-60" />
+              <span className="relative min-w-[16px] h-4 bg-danger-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5">
+                {activeAlertCount > 99 ? '99+' : activeAlertCount}
+              </span>
             </span>
           )}
         </button>

@@ -1,14 +1,14 @@
 import React, { useMemo, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { BiSolidDashboard } from 'react-icons/bi';
-import { FiUsers, FiCpu, FiBell, FiUser, FiSettings, FiBarChart2, FiBox, FiFileText } from 'react-icons/fi';
+import { FiUsers, FiCpu, FiBell, FiUser, FiSettings, FiBarChart2, FiBox, FiFileText, FiShield } from 'react-icons/fi';
 import { MdOutlineEco } from 'react-icons/md';
 import { useAuth } from '../../context/AuthContext';
 
 const ACTIVE_CLS =
-  'flex items-center gap-3 px-4 py-2.5 mt-1 text-sm font-semibold text-white bg-[#2E3A8C] rounded-lg cursor-pointer transition-all duration-200';
+  'flex items-center gap-3 px-4 py-2.5 mt-1 text-sm font-semibold text-white bg-brand-600 rounded-lg cursor-pointer shadow-soft transition-all duration-200';
 const INACTIVE_CLS =
-  'flex items-center gap-3 px-4 py-2.5 mt-1 text-sm font-medium text-[#49608c] rounded-lg cursor-pointer hover:bg-[#eef0f8] hover:text-[#2E3A8C] transition-all duration-200';
+  'flex items-center gap-3 px-4 py-2.5 mt-1 text-sm font-medium text-ink rounded-lg cursor-pointer hover:bg-brand-50 hover:text-brand-600 hover:translate-x-0.5 transition-all duration-200';
 
 const SidebarsContent = () => {
   const navigate = useNavigate();
@@ -53,6 +53,12 @@ const SidebarsContent = () => {
       show: isAdmin,
     },
     {
+      path: '/admin/roles',
+      label: 'Roles',
+      icon: <FiShield size={20} />,
+      show: hasPermission('roles', 'read'),
+    },
+    {
       path: '/admin/audit-logs',
       label: 'Audit Logs',
       icon: <FiFileText size={20} />,
@@ -82,16 +88,23 @@ const SidebarsContent = () => {
 
   return (
     <nav className="mt-2">
-      {menuItems.map((item) => (
-        <div
-          key={item.path}
-          className={pathname === item.path ? ACTIVE_CLS : INACTIVE_CLS}
-          onClick={() => handleClick(item.path)}
-        >
-          {item.icon}
-          <span>{item.label}</span>
-        </div>
-      ))}
+      {menuItems.map((item) => {
+        const isActive = pathname === item.path;
+        return (
+          <div
+            key={item.path}
+            role="button"
+            tabIndex={0}
+            aria-current={isActive ? 'page' : undefined}
+            className={isActive ? ACTIVE_CLS : INACTIVE_CLS}
+            onClick={() => handleClick(item.path)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick(item.path); } }}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </div>
+        );
+      })}
     </nav>
   );
 };

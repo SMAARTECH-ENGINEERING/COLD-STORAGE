@@ -38,7 +38,15 @@ const PERMISSIONS = {
     resource: 'audit_logs',
     actions: { READ: 'read' },
   },
+  ROLES: {
+    resource: 'roles',
+    actions: { CREATE: 'create', READ: 'read', UPDATE: 'update', DELETE: 'delete' },
+  },
 };
+
+// Built-in role names — protected from rename/delete since other parts of the
+// system (e.g. the super_admin permission bypass in rbac middleware) rely on them existing.
+const SYSTEM_ROLE_NAMES = Object.values(ROLES);
 
 // RBAC permission matrix
 const ROLE_PERMISSIONS = {
@@ -51,6 +59,7 @@ const ROLE_PERMISSIONS = {
     { resource: 'alerts', actions: ['read', 'acknowledge', 'delete'] },
     { resource: 'dashboard', actions: ['read'] },
     { resource: 'audit_logs', actions: ['read'] },
+    { resource: 'roles', actions: ['create', 'read', 'update', 'delete'] },
   ],
   [ROLES.ADMIN]: [
     { resource: 'users', actions: ['create', 'read', 'update', 'delete'] },
@@ -61,6 +70,7 @@ const ROLE_PERMISSIONS = {
     { resource: 'alerts', actions: ['read', 'acknowledge'] },
     { resource: 'dashboard', actions: ['read'] },
     { resource: 'audit_logs', actions: ['read'] },
+    { resource: 'roles', actions: ['read'] },
   ],
   [ROLES.OPERATOR]: [
     { resource: 'users', actions: ['read'] },
@@ -114,6 +124,7 @@ const VEGETABLE_PACKING_DENSITIES = {
 module.exports = {
   ROLES,
   PERMISSIONS,
+  SYSTEM_ROLE_NAMES,
   ROLE_PERMISSIONS,
   ALERT_SEVERITY_MAP,
   PAGINATION,
